@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'corsheaders',
 
     # Local apps
+    'apps.accounts',
     'apps.destinations',
     'apps.trips',
     'apps.bookings',

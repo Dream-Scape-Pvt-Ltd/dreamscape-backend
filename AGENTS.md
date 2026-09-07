@@ -45,6 +45,7 @@ backend/
 │       ├── development.py
 │       └── production.py
 └── apps/
+    ├── accounts/           # Custom User, JWT auth, Role permissions, Profile management
     ├── destinations/        # Countries, Regions, Activities & Multi-Country circuits
     ├── trips/               # Treks, Expeditions, Itineraries, Departures & Elevation maps
     ├── bookings/            # Split payment engine (20% deposit / 80% balance), travelers
@@ -54,6 +55,40 @@ backend/
     ├── content_cms/         # Travel Guides, FAQs, Responsible Travel, SEO Schema.org
     └── search/              # PostgreSQL Full-Text Search (vector/rank across content)
 ```
+
+### 2.1. App Structure & Modular Layout
+Each domain app under `apps/` uses a modular package structure for `models/` and `views/` (instead of monolithic `models.py` and `views.py` files):
+
+```text
+apps/<app_name>/
+├── __init__.py
+├── admin.py
+├── apps.py
+├── migrations/
+│   └── __init__.py
+├── models/
+│   └── __init__.py      # Re-exports all sub-models for Django ORM & migrations
+├── views/
+│   └── __init__.py      # Re-exports viewsets / API views
+├── serializers/         # DRF serializers (as needed)
+├── urls.py              # App-level routing
+└── tests.py
+```
+
+### 2.2. Creating New Apps in the `apps/` Folder
+When creating a new domain app within `apps/`, follow this exact sequence:
+1. **Create target directory**: `mkdir apps/<app_name>` (Django requires the target folder to exist when providing a custom path).
+2. **Generate app template**: `python manage.py startapp <app_name> apps/<app_name>`
+3. **Configure AppConfig name**: In `apps/<app_name>/apps.py`, update `name` to include the namespace:
+   ```python
+   class <AppName>Config(AppConfig):
+       default_auto_field = 'django.db.models.BigAutoField'
+       name = 'apps.<app_name>'
+   ```
+4. **Register in settings**: In `config/settings.py`, register `'apps.<app_name>'` in `INSTALLED_APPS`.
+5. **Modularize models & views**:
+   - Replace `models.py` with `models/` folder containing `__init__.py`. Re-export any model defined in submodules in `__init__.py` so Django automatically detects it for migrations.
+   - Replace `views.py` with `views/` folder containing `__init__.py`.
 
 ---
 
