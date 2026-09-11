@@ -1,6 +1,12 @@
-"""
-Models package for b2b.
-All models must be imported here for Django's migration engine and model registry to discover them.
-Example:
-    from .user import User
-"""
+from .partner import B2BPartner, AgencyTier
+from .asset import B2BAsset, AssetType
+from .booking import B2BBooking, CommissionStatus
+
+__all__ = [
+    "B2BPartner",
+    "AgencyTier",
+    "B2BAsset",
+    "AssetType",
+    "B2BBooking",
+    "CommissionStatus",
+]

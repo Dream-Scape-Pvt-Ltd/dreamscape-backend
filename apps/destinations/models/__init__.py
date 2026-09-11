@@ -1,6 +1,8 @@
-"""
-Models package for destinations.
-All models must be imported here for Django's migration engine and model registry to discover them.
-Example:
-    from .user import User
-"""
+from .destination import Destination, DestinationCountry
+from .category import ActivityCategory
+
+__all__ = [
+    "Destination",
+    "DestinationCountry",
+    "ActivityCategory",
+]

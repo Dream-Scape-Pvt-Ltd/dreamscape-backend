@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.common.models import MediaAsset
+from apps.common.models.media import MediaAsset
 
 class MediaAssetReadSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.SerializerMethodField()

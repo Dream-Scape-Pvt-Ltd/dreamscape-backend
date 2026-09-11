@@ -1,6 +1,8 @@
-"""
-Models package for content_cms.
-All models must be imported here for Django's migration engine and model registry to discover them.
-Example:
-    from .user import User
-"""
+from .guide import TravelGuide, GuideCategory
+from .initiative import ResponsibleTravelInitiative
+
+__all__ = [
+    "TravelGuide",
+    "GuideCategory",
+    "ResponsibleTravelInitiative",
+]
