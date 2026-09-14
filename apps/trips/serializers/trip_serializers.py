@@ -1,11 +1,11 @@
 from django.db.models import Avg
 from rest_framework import serializers
 
-from apps.destinations.serializers.destination_serializers import DestinationListSerializer
 from apps.destinations.serializers.category_serializers import ActivityCategorySerializer
-from apps.trips.models import Trip, PeakExpeditionDetail
-from apps.trips.serializers.itinerary_serializers import ItineraryDaySerializer
+from apps.destinations.serializers.destination_serializers import DestinationListSerializer
+from apps.trips.models import PeakExpeditionDetail, Trip
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
+from apps.trips.serializers.itinerary_serializers import ItineraryDaySerializer
 from apps.trips.serializers.review_serializers import TripReviewReadSerializer
 
 
@@ -17,12 +17,14 @@ class PeakExpeditionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = PeakExpeditionDetail
         fields = [
+            "id",
             "summit_window",
             "technical_rating",
             "gear_requirements",
             "permit_fee_type",
             "mandatory_certifications",
         ]
+        read_only_fields = ["id"]
 
 
 class TripListSerializer(serializers.ModelSerializer):
@@ -32,7 +34,11 @@ class TripListSerializer(serializers.ModelSerializer):
     """
 
     destination_name = serializers.CharField(source="destination.name", read_only=True)
+    destination_slug = serializers.CharField(source="destination.slug", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
+    category_slug = serializers.CharField(source="category.slug", read_only=True)
+    rating_avg = serializers.SerializerMethodField()
+    reviews_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
@@ -41,15 +47,30 @@ class TripListSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "destination_name",
+            "destination_slug",
             "category_name",
+            "category_slug",
             "duration_days",
             "starting_price_usd",
             "altitude_max_meters",
             "difficulty_grade",
             "is_featured",
             "is_active",
+            "rating_avg",
+            "reviews_count",
         ]
         read_only_fields = fields
+
+    def get_rating_avg(self, obj) -> float | None:
+        if hasattr(obj, "rating_avg") and obj.rating_avg is not None:
+            return round(float(obj.rating_avg), 1)
+        avg = obj.reviews.filter(is_published=True).aggregate(Avg("rating_overall"))["rating_overall__avg"]
+        return round(float(avg), 1) if avg else None
+
+    def get_reviews_count(self, obj) -> int:
+        if hasattr(obj, "reviews_count"):
+            return obj.reviews_count
+        return obj.reviews.filter(is_published=True).count()
 
 
 class TripDetailSerializer(serializers.ModelSerializer):
@@ -103,7 +124,6 @@ class TripDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_departures(self, obj):
-        # Upcoming available departures
         departures = obj.departures.filter(available_seats__gt=0).order_by("start_date")[:10]
         return TripDepartureSerializer(departures, many=True).data
 
@@ -123,11 +143,12 @@ class TripDetailSerializer(serializers.ModelSerializer):
         }
 
     def get_schema_org_json_ld(self, obj):
-        return {
+        rating_summary = self.get_rating_summary(obj)
+        schema = {
             "@context": "https://schema.org",
             "@type": "TouristTrip",
             "name": obj.title,
-            "description": obj.overview[:200] if obj.overview else obj.title,
+            "description": obj.overview[:250] if obj.overview else obj.title,
             "touristType": obj.category.name if obj.category else "Trekking",
             "offers": {
                 "@type": "Offer",
@@ -136,3 +157,43 @@ class TripDetailSerializer(serializers.ModelSerializer):
                 "availability": "https://schema.org/InStock",
             },
         }
+        if rating_summary["total_reviews"] > 0:
+            schema["aggregateRating"] = {
+                "@type": "AggregateRating",
+                "ratingValue": str(rating_summary["average_rating"]),
+                "reviewCount": str(rating_summary["total_reviews"]),
+                "bestRating": "5",
+                "worstRating": "1",
+            }
+        return schema
+
+
+class TripWriteSerializer(serializers.ModelSerializer):
+    """
+    Admin serializer for creating and updating Trip records.
+    """
+
+    class Meta:
+        model = Trip
+        fields = [
+            "id",
+            "destination",
+            "category",
+            "title",
+            "slug",
+            "duration_days",
+            "altitude_max_meters",
+            "difficulty_grade",
+            "min_group_size",
+            "max_group_size",
+            "best_seasons",
+            "inclusions",
+            "exclusions",
+            "packing_list",
+            "starting_price_usd",
+            "single_supplement_usd",
+            "overview",
+            "is_featured",
+            "is_active",
+        ]
+        read_only_fields = ["id"]

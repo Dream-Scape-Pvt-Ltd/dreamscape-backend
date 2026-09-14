@@ -1,6 +1,15 @@
-"""
-Views package for destinations.
-Import and expose viewsets/API views here for clean routing in urls.py.
-Example:
-    from .user_views import UserViewSet
-"""
+from .category_views import (
+    ActivityCategoryDetailView,
+    ActivityCategoryListCreateView,
+)
+from .destination_views import (
+    DestinationDetailView,
+    DestinationListCreateView,
+)
+
+__all__ = [
+    "DestinationListCreateView",
+    "DestinationDetailView",
+    "ActivityCategoryListCreateView",
+    "ActivityCategoryDetailView",
+]

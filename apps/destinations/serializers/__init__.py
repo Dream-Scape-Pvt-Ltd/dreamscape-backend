@@ -1,11 +1,13 @@
 from .destination_serializers import (
-    DestinationListSerializer,
     DestinationDetailSerializer,
+    DestinationListSerializer,
+    DestinationWriteSerializer,
 )
 from .category_serializers import ActivityCategorySerializer
 
 __all__ = [
     "DestinationListSerializer",
     "DestinationDetailSerializer",
+    "DestinationWriteSerializer",
     "ActivityCategorySerializer",
 ]

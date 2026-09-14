@@ -1,9 +1,17 @@
-﻿"""
-apps.destinations URL configuration -- Phase 0 stub.
-Endpoints will be registered in their respective implementation phase.
-"""
 from django.urls import path
 
+from apps.destinations.views import (
+    ActivityCategoryDetailView,
+    ActivityCategoryListCreateView,
+    DestinationDetailView,
+    DestinationListCreateView,
+)
+
+app_name = "destinations"
+
 urlpatterns = [
-    # Endpoints registered in Phase 2-7
+    path("", DestinationListCreateView.as_view(), name="destination-list"),
+    path("activity-categories/", ActivityCategoryListCreateView.as_view(), name="category-list"),
+    path("activity-categories/<slug:slug>/", ActivityCategoryDetailView.as_view(), name="category-detail"),
+    path("<slug:slug>/", DestinationDetailView.as_view(), name="destination-detail"),
 ]

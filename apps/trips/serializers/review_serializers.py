@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from apps.trips.models import TripReview
+
 from apps.bookings.models import Booking
+from apps.trips.models import TripReview
 
 
 class TripReviewReadSerializer(serializers.ModelSerializer):
@@ -75,10 +76,27 @@ class TripReviewCreateSerializer(serializers.ModelSerializer):
             except Booking.DoesNotExist:
                 raise serializers.ValidationError({"booking_id": "Specified booking was not found."})
 
+        # By default in production, new reviews require moderation (is_published=False)
         review = TripReview.objects.create(
             user=user,
             booking=booking,
             is_verified=is_verified,
+            is_published=False,
             **validated_data,
         )
         return review
+
+
+class TripReviewModerationSerializer(serializers.ModelSerializer):
+    """
+    Admin serializer for moderating and publishing reviews.
+    """
+
+    class Meta:
+        model = TripReview
+        fields = [
+            "id",
+            "is_published",
+            "is_verified",
+        ]
+        read_only_fields = ["id"]

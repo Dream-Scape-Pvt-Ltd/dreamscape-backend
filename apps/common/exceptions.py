@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import ProtectedError
 from rest_framework import status
 from rest_framework.exceptions import (
     APIException,
@@ -50,6 +51,17 @@ def custom_exception_handler(exc, context):
     # Convert Django's core ValidationError to DRF's ValidationError
     if isinstance(exc, DjangoValidationError):
         exc = ValidationError(detail=exc.messages)
+
+    # Handle Django ProtectedError (e.g. attempting to delete a trip with active departures)
+    if isinstance(exc, ProtectedError):
+        return Response(
+            _build_error_envelope(
+                code="PROTECTED_ERROR",
+                message="Cannot delete this resource because it is referenced by other active records (such as departures or bookings).",
+                details=None,
+            ),
+            status=status.HTTP_409_CONFLICT,
+        )
 
     # Let DRF do its default handling first to get a Response object.
     response = drf_exception_handler(exc, context)
