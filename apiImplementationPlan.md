@@ -555,16 +555,16 @@ urlpatterns = [
 
 ### Phase 3 Checklist
 
-- [ ] `apps/bookings/serializers/passenger_serializers.py`
-- [ ] `apps/bookings/serializers/booking_serializers.py`
-- [ ] `apps/bookings/views/booking_views.py`
-- [ ] `apps/bookings/views/passenger_views.py`
-- [ ] `apps/bookings/utils.py` — `generate_booking_reference()`
-- [ ] `apps/bookings/urls.py`
-- [ ] Verify: `POST /api/v1/bookings/` with `DEPOSIT_20` creates booking and decrements seats
-- [ ] Verify: Concurrent booking attempts on a 1-seat departure — only one succeeds
-- [ ] Verify: Passport expiry < 6 months from trip start returns `400`
-- [ ] Verify: `PATCH /api/v1/bookings/{ref}/cancel/` restores seat count
+- [x] `apps/bookings/serializers/passenger_serializers.py`
+- [x] `apps/bookings/serializers/booking_serializers.py`
+- [x] `apps/bookings/views/booking_views.py`
+- [x] `apps/bookings/views/passenger_views.py`
+- [x] `apps/bookings/utils.py` — `generate_booking_reference()`
+- [x] `apps/bookings/urls.py`
+- [x] Verify: `POST /api/v1/bookings/` with `DEPOSIT_20` creates booking and decrements seats
+- [x] Verify: Concurrent booking attempts on a 1-seat departure — only one succeeds
+- [x] Verify: Passport expiry < 6 months from trip start returns `400`
+- [x] Verify: `PATCH /api/v1/bookings/{ref}/cancel/` restores seat count
 
 ---
 

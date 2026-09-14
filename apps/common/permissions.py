@@ -65,13 +65,23 @@ class IsOwnerOrAdmin(BasePermission):
     message = "You do not have permission to access this resource."
 
     def has_object_permission(self, request, view, obj):
-        if request.user.role == UserRole.ADMIN:
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.user.role in (UserRole.ADMIN, UserRole.SALES_AGENT):
             return True
-        # Support both direct user FK and email-based guest bookings
-        if hasattr(obj, "customer_user"):
-            return obj.customer_user == request.user
-        if hasattr(obj, "user"):
-            return obj.user == request.user
+        # Direct booking ownership
+        if hasattr(obj, "customer_user") and obj.customer_user == request.user:
+            return True
+        if hasattr(obj, "customer_email") and request.user.email and obj.customer_email.lower() == request.user.email.lower():
+            return True
+        # Passenger detail ownership via parent booking
+        if hasattr(obj, "booking"):
+            if obj.booking.customer_user == request.user:
+                return True
+            if request.user.email and obj.booking.customer_email and obj.booking.customer_email.lower() == request.user.email.lower():
+                return True
+        if hasattr(obj, "user") and obj.user == request.user:
+            return True
         return False
 
 

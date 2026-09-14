@@ -1,6 +1,17 @@
-"""
-Views package for bookings.
-Import and expose viewsets/API views here for clean routing in urls.py.
-Example:
-    from .user_views import UserViewSet
-"""
+from .booking_views import (
+    BookingListCreateView,
+    BookingDetailView,
+    BookingCancelView,
+)
+from .passenger_views import (
+    PassengerListView,
+    PassengerDetailView,
+)
+
+__all__ = [
+    "BookingListCreateView",
+    "BookingDetailView",
+    "BookingCancelView",
+    "PassengerListView",
+    "PassengerDetailView",
+]

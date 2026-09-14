@@ -71,6 +71,7 @@ class Booking(TimeStampedModel):
     )
     trip_start_date = models.DateField(db_index=True)
     balance_due_date = models.DateField(null=True, blank=True, db_index=True)
+    cancellation_reason = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "bookings"
