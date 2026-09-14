@@ -1,6 +1,27 @@
-"""
-Views package for accounts.
-Import and expose viewsets/API views here for clean routing in urls.py.
-Example:
-    from .user_views import UserViewSet
-"""
+from .auth_views import (
+    LoginView,
+    LogoutView,
+    PasswordChangeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RegisterView,
+    TokenRefreshView,
+)
+from .user_views import (
+    UserDetailView,
+    UserListView,
+    UserProfileView,
+)
+
+__all__ = [
+    "RegisterView",
+    "LoginView",
+    "TokenRefreshView",
+    "LogoutView",
+    "PasswordChangeView",
+    "PasswordResetRequestView",
+    "PasswordResetConfirmView",
+    "UserProfileView",
+    "UserListView",
+    "UserDetailView",
+]
