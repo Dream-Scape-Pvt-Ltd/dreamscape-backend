@@ -1,9 +1,14 @@
-﻿"""
-apps.inquiries URL configuration -- Phase 0 stub.
-Endpoints will be registered in their respective implementation phase.
-"""
 from django.urls import path
+from apps.inquiries.views import (
+    InquiryListCreateView,
+    InquiryDetailUpdateView,
+    InquiryNoteListCreateView,
+)
+
+app_name = "inquiries"
 
 urlpatterns = [
-    # Endpoints registered in Phase 2-7
+    path("", InquiryListCreateView.as_view(), name="inquiry-list-create"),
+    path("<str:inquiry_number>/", InquiryDetailUpdateView.as_view(), name="inquiry-detail"),
+    path("<str:inquiry_number>/notes/", InquiryNoteListCreateView.as_view(), name="inquiry-notes"),
 ]

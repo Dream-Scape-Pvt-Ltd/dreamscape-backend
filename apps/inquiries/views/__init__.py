@@ -1,6 +1,11 @@
-"""
-Views package for inquiries.
-Import and expose viewsets/API views here for clean routing in urls.py.
-Example:
-    from .user_views import UserViewSet
-"""
+from .inquiry_views import (
+    InquiryListCreateView,
+    InquiryDetailUpdateView,
+    InquiryNoteListCreateView,
+)
+
+__all__ = [
+    "InquiryListCreateView",
+    "InquiryDetailUpdateView",
+    "InquiryNoteListCreateView",
+]

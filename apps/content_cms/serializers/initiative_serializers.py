@@ -17,4 +17,4 @@ class ResponsibleTravelSerializer(serializers.ModelSerializer):
             "content",
             "is_published",
         ]
-        read_only_fields = fields
+        read_only_fields = ['id']

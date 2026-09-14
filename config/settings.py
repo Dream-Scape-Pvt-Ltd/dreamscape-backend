@@ -211,6 +211,11 @@ SPECTACULAR_SETTINGS = {
     'SCHEMA_PATH_PREFIX': '/api/v1/',
     'COMPONENT_SPLIT_REQUEST': True,
     'SORT_OPERATIONS': False,
+    'ENUM_NAME_OVERRIDES': {
+        'AgencyTierEnum': 'apps.b2b.models.AgencyTier.choices',
+        'GuideCategoryEnum': 'apps.content_cms.models.GuideCategory.choices',
+        'FAQCategoryEnum': 'apps.faq.models.FAQCategory.choices',
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -236,3 +241,23 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
     'x-khalti-signature',  # Khalti webhook signature header
 ]
+
+# Partner portal infrastructure. Private files must never be served as public media.
+B2B_PRIVATE_ROOT = env('B2B_PRIVATE_ROOT', default=str(BASE_DIR / 'private_media'))
+B2B_DOWNLOAD_TTL = env.int('B2B_DOWNLOAD_TTL', default=300)
+RESEND_API_KEY = env('RESEND_API_KEY', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@dreamscapetreks.com')
+B2B_ADMIN_EMAIL = env('B2B_ADMIN_EMAIL', default='')
+PUBLIC_SITE_URL = env('PUBLIC_SITE_URL', default='https://dreamscape-treks.com').rstrip('/')
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_BROKER_CONNECTION_TIMEOUT = 2
+CELERY_TASK_PUBLISH_RETRY = False
+CELERY_BEAT_SCHEDULE = {
+    'deliver-partner-email-outbox': {
+        'task': 'apps.b2b.tasks.dispatch_pending_partner_emails',
+        'schedule': 5.0,
+    },
+}

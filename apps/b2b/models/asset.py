@@ -1,6 +1,7 @@
 from django.db import models
 from apps.common.models.base import TimeStampedModel
 from apps.b2b.models.partner import AgencyTier
+from apps.b2b.storage import PrivateAssetStorage
 
 
 class AssetType(models.TextChoices):
@@ -27,7 +28,7 @@ class B2BAsset(TimeStampedModel):
         choices=AssetType.choices,
         db_index=True,
     )
-    file = models.FileField(upload_to="b2b_assets/")
+    file = models.FileField(upload_to="b2b_assets/", storage=PrivateAssetStorage())
     minimum_tier = models.CharField(
         max_length=20,
         choices=AgencyTier.choices,

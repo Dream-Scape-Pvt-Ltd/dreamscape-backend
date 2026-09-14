@@ -2,9 +2,10 @@ from rest_framework import serializers
 from apps.inquiries.models import TailorMadeRequest
 
 
-class TailorMadeRequestCreateSerializer(serializers.ModelSerializer):
+class TailorMadeRequestSerializer(serializers.ModelSerializer):
     """
-    Serializer for tailor-made custom trip requests with interactive map waypoints.
+    Serializer for tailor-made custom adventure specifications,
+    including bespoke destinations, activity desires, and GeoJSON route coordinates.
     """
 
     class Meta:
@@ -18,4 +19,11 @@ class TailorMadeRequestCreateSerializer(serializers.ModelSerializer):
             "guide_language_preference",
             "custom_route_coordinates",
             "waypoints",
+            "created_at",
+            "updated_at",
         ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+# Alias for backward compatibility
+TailorMadeRequestCreateSerializer = TailorMadeRequestSerializer

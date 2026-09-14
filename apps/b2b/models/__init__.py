@@ -1,6 +1,7 @@
 from .partner import B2BPartner, AgencyTier
 from .asset import B2BAsset, AssetType
 from .booking import B2BBooking, CommissionStatus
+from .notification import PartnerEmail
 
 __all__ = [
     "B2BPartner",
@@ -9,4 +10,6 @@ __all__ = [
     "AssetType",
     "B2BBooking",
     "CommissionStatus",
+    "PartnerEmail",
+    "PartnerEmail",
 ]

@@ -3,7 +3,11 @@ apps.faq URL configuration -- Phase 0 stub.
 Endpoints will be registered in their respective implementation phase.
 """
 from django.urls import path
+from apps.faq.views import FAQListCreateView, FAQDetailView
+
+app_name = 'faq'
 
 urlpatterns = [
-    # Endpoints registered in Phase 2-7
+    path('', FAQListCreateView.as_view(), name='faq-list'),
+    path('<uuid:pk>/', FAQDetailView.as_view(), name='faq-detail'),
 ]

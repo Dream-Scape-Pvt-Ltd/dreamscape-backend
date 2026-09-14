@@ -28,9 +28,9 @@ class FAQSerializer(serializers.ModelSerializer):
             "schema_org_json_ld",
             "is_active",
         ]
-        read_only_fields = fields
+        read_only_fields = ['id', 'trip_title', 'destination_name', 'schema_org_json_ld']
 
-    def get_schema_org_json_ld(self, obj):
+    def get_schema_org_json_ld(self, obj) -> dict:
         return {
             "@context": "https://schema.org",
             "@type": "Question",
@@ -40,3 +40,8 @@ class FAQSerializer(serializers.ModelSerializer):
                 "text": obj.answer,
             },
         }
+
+
+class FAQResponseSerializer(serializers.Serializer):
+    faqs = FAQSerializer(many=True)
+    schema_org = serializers.JSONField()

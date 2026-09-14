@@ -804,16 +804,16 @@ urlpatterns = [
 
 ### Phase 5 Checklist
 
-- [ ] `apps/inquiries/serializers/inquiry_serializers.py` — 5 serializers
-- [ ] `apps/inquiries/serializers/tailor_made_serializers.py`
-- [ ] `apps/inquiries/views/inquiry_views.py` — 5 views
-- [ ] `apps/inquiries/tasks.py` — acknowledgement email + agent WhatsApp alert
-- [ ] `apps/inquiries/utils.py` — `generate_inquiry_number()`
-- [ ] `apps/inquiries/urls.py`
-- [ ] Verify: `POST /api/v1/inquiries/` (TAILOR_MADE) creates both `Inquiry` + `TailorMadeRequest`
-- [ ] Verify: Celery acknowledgement email task fires within 5 seconds
-- [ ] Verify: `GET /api/v1/inquiries/` returns `403` for `CUSTOMER` role
-- [ ] Verify: `PATCH /api/v1/inquiries/{num}/` updates status with valid transition
+- [x] `apps/inquiries/serializers/inquiry_serializers.py` — 5 serializers
+- [x] `apps/inquiries/serializers/tailor_made_serializers.py`
+- [x] `apps/inquiries/views/inquiry_views.py` — 5 views
+- [x] `apps/inquiries/tasks.py` — acknowledgement email + agent WhatsApp alert
+- [x] `apps/inquiries/utils.py` — `generate_inquiry_number()`
+- [x] `apps/inquiries/urls.py`
+- [x] Verify: `POST /api/v1/inquiries/` (TAILOR_MADE) creates both `Inquiry` + `TailorMadeRequest`
+- [x] Verify: Celery acknowledgement email task fires within 5 seconds
+- [x] Verify: `GET /api/v1/inquiries/` returns `403` for `CUSTOMER` role
+- [x] Verify: `PATCH /api/v1/inquiries/{num}/` updates status with valid transition
 
 ---
 
@@ -906,17 +906,19 @@ urlpatterns = [
 
 ### Phase 6 Checklist
 
-- [ ] `apps/b2b/serializers/partner_serializers.py`
-- [ ] `apps/b2b/serializers/asset_serializers.py`
-- [ ] `apps/b2b/serializers/booking_serializers.py`
-- [ ] `apps/b2b/views/partner_views.py`
-- [ ] `apps/b2b/views/asset_views.py`
-- [ ] `apps/b2b/views/booking_views.py`
-- [ ] `apps/b2b/urls.py`
-- [ ] Verify: `POST /api/v1/b2b/register/` creates User + pending partner profile
-- [ ] Verify: Unapproved partner cannot access `/b2b/assets/` — returns `403`
-- [ ] Verify: BRONZE partner cannot download GOLD-tier asset — returns `403 TIER_INSUFFICIENT`
-- [ ] Verify: `POST /api/v1/b2b/partners/{id}/approve/` triggers approval email via Celery
+Implementation verified with API tests. Email dispatch/provider calls are mocked in tests; live delivery requires the worker, Redis and Resend configuration. Private signed API downloads are implemented; production CDN signing remains a separate integration milestone. See [setup and verification](PHASE_6_7_SETUP.md).
+
+- [x] `apps/b2b/serializers/partner_serializers.py`
+- [x] `apps/b2b/serializers/asset_serializers.py`
+- [x] `apps/b2b/serializers/booking_serializers.py`
+- [x] `apps/b2b/views/partner_views.py`
+- [x] `apps/b2b/views/asset_views.py`
+- [x] `apps/b2b/views/booking_views.py`
+- [x] `apps/b2b/urls.py`
+- [x] Verify: `POST /api/v1/b2b/register/` creates User + pending partner profile
+- [x] Verify: Unapproved partner cannot access `/b2b/assets/` — returns `403`
+- [x] Verify: BRONZE partner cannot download GOLD-tier asset — returns `403 TIER_INSUFFICIENT`
+- [x] Verify: `POST /api/v1/b2b/partners/{id}/approve/` triggers approval email via Celery
 
 ---
 
@@ -996,7 +998,7 @@ urlpatterns = [
 
 > **Phase 1 implementation**: Query-time `SearchVector` annotation (no stored vector field). Sufficient for launch.
 
-**New File:** `apps/search/views.py`
+**New File:** `apps/search/views/search_views.py`
 
 ```python
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
@@ -1051,7 +1053,7 @@ class UnifiedSearchView(APIView):
         return Response({'query': query, 'count': len(results), 'results': results})
 ```
 
-**New File:** `apps/search/serializers.py`
+**New File:** `apps/search/serializers/search_serializers.py`
 
 | Serializer | Purpose |
 | :--- | :--- |
@@ -1067,30 +1069,32 @@ urlpatterns = [
 
 ### Phase 7 Checklist
 
+Implemented using modular views/serializers packages. PostgreSQL tests cover publication visibility, soft deletion, FAQPage output and global search pagination.
+
 **Content CMS**
-- [ ] `apps/content_cms/serializers/guide_serializers.py`
-- [ ] `apps/content_cms/serializers/initiative_serializers.py`
-- [ ] `apps/content_cms/views/guide_views.py`
-- [ ] `apps/content_cms/views/initiative_views.py`
-- [ ] `apps/content_cms/urls.py`
+- [x] `apps/content_cms/serializers/guide_serializers.py`
+- [x] `apps/content_cms/serializers/initiative_serializers.py`
+- [x] `apps/content_cms/views/guide_views.py`
+- [x] `apps/content_cms/views/initiative_views.py`
+- [x] `apps/content_cms/urls.py`
 
 **FAQs**
-- [ ] `apps/faq/serializers/faq_serializers.py`
-- [ ] `apps/faq/views/faq_views.py`
-- [ ] `apps/faq/urls.py`
+- [x] `apps/faq/serializers/faq_serializers.py`
+- [x] `apps/faq/views/faq_views.py`
+- [x] `apps/faq/urls.py`
 
 **Search**
-- [ ] `apps/search/views.py`
-- [ ] `apps/search/serializers.py`
-- [ ] `apps/search/urls.py`
+- [x] `apps/search/views/search_views.py`
+- [x] `apps/search/serializers/search_serializers.py`
+- [x] `apps/search/urls.py`
 
 **Verification**
-- [ ] `GET /api/v1/content/guides/` returns paginated published guides
-- [ ] `GET /api/v1/content/guides/{slug}/` includes Schema.org `Article` JSON-LD
-- [ ] `GET /api/v1/faqs/?trip=everest-base-camp-trek` returns trip-specific FAQs + `FAQPage` JSON-LD
-- [ ] `GET /api/v1/search/?q=everest` returns ranked results across trips, destinations, guides, FAQs
-- [ ] `GET /api/v1/search/?q=e` returns `400` (query too short)
-- [ ] Publishing a guide for the first time auto-sets `published_at`
+- [x] `GET /api/v1/content/guides/` returns paginated published guides
+- [x] `GET /api/v1/content/guides/{slug}/` includes Schema.org `Article` JSON-LD
+- [x] `GET /api/v1/faqs/?trip=everest-base-camp-trek` returns trip-specific FAQs + `FAQPage` JSON-LD
+- [x] `GET /api/v1/search/?q=everest` returns ranked results across trips, destinations, guides, FAQs
+- [x] `GET /api/v1/search/?q=e` returns `400` (query too short)
+- [x] Publishing a guide for the first time auto-sets `published_at`
 
 ---
 

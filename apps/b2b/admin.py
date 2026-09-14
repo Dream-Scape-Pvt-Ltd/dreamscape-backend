@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django import forms
+from django.db import models
 from apps.b2b.models import B2BPartner, B2BAsset, B2BBooking
 
 
@@ -11,6 +13,8 @@ class B2BPartnerAdmin(admin.ModelAdmin):
 
 @admin.register(B2BAsset)
 class B2BAssetAdmin(admin.ModelAdmin):
+    # The standard ClearableFileInput accesses file.url, forbidden for private storage.
+    formfield_overrides = {models.FileField: {'widget': forms.FileInput}}
     list_display = ("title", "asset_type", "trip", "minimum_tier", "is_active", "created_at")
     list_filter = ("asset_type", "minimum_tier", "is_active")
     search_fields = ("title", "trip__title")

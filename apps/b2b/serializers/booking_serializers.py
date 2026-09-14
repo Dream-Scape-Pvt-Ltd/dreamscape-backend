@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from apps.b2b.models import B2BBooking
+from apps.b2b.models import B2BBooking, CommissionStatus
+from django.utils import timezone
 
 
 class B2BBookingSerializer(serializers.ModelSerializer):
@@ -9,7 +10,7 @@ class B2BBookingSerializer(serializers.ModelSerializer):
     """
 
     booking_reference = serializers.CharField(source="booking.booking_reference", read_only=True)
-    trip_title = serializers.CharField(source="booking.departure.trip.title", read_only=True)
+    trip_title = serializers.SerializerMethodField()
     num_travelers = serializers.IntegerField(source="booking.num_travelers", read_only=True)
     trip_start_date = serializers.DateField(source="booking.trip_start_date", read_only=True)
 
@@ -32,3 +33,27 @@ class B2BBookingSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_trip_title(self, obj) -> str | None:
+        if obj.booking.departure_id:
+            return obj.booking.departure.trip.title
+        if obj.booking.custom_trip_id:
+            return obj.booking.custom_trip.title
+        return None
+
+
+class B2BCommissionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = B2BBooking
+        fields = ['commission_status']
+
+    def update(self, instance, validated_data):
+        new_status = validated_data['commission_status']
+        now = timezone.now()
+        if new_status == CommissionStatus.INVOICED and not instance.commission_invoiced_at:
+            instance.commission_invoiced_at = now
+        if new_status == CommissionStatus.PAID and not instance.commission_paid_at:
+            instance.commission_paid_at = now
+        if new_status != CommissionStatus.PAID:
+            instance.commission_paid_at = None
+        return super().update(instance, validated_data)
