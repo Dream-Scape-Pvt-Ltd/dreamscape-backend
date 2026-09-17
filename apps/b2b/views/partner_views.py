@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -24,22 +24,11 @@ class PartnerRegistrationThrottle(RegistrationThrottle):
 
 class B2BRegisterView(generics.GenericAPIView):
     permission_classes = [AllowAny]
-    throttle_classes = [PartnerRegistrationThrottle]
-    serializer_class = B2BRegistrationSerializer
 
-    @extend_schema(responses={201: B2BRegistrationResponseSerializer})
     def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        try:
-            partner = serializer.save()
-        except IntegrityError:
-            raise ValidationError({'email': 'Registration conflicts with an existing account.'})
-        response = Response({'user_id': partner.user_id, 'partner_id': partner.pk,
-                             'company_name': partner.company_name, 'agency_tier': partner.agency_tier,
-                             'approved': partner.approved}, status=status.HTTP_201_CREATED)
-        response.success_message = 'Registration received. Your agency account is pending admin approval.'
-        return response
+        raise PermissionDenied(
+            'Public agency registration is disabled. Please submit a wholesale partnership inquiry via /api/v1/inquiries/.'
+        )
 
 
 class B2BPartnerListView(generics.ListAPIView):

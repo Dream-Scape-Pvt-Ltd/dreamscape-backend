@@ -9,6 +9,7 @@ from apps.trips.views import (
     ReviewListCreateView,
     ReviewModerationView,
     TripDetailView,
+    TripHighlightView,
     TripListCreateView,
 )
 
@@ -16,6 +17,7 @@ app_name = "trips"
 
 urlpatterns = [
     path("", TripListCreateView.as_view(), name="trip-list"),
+    path("highlights/", TripHighlightView.as_view(), name="trip-highlights"),
     path("<slug:slug>/itinerary/", ItineraryView.as_view(), name="trip-itinerary"),
     path("<slug:slug>/itinerary/<int:day_number>/", ItineraryDayDetailView.as_view(), name="itinerary-day"),
     path("<slug:slug>/departures/", DepartureListCreateView.as_view(), name="departure-list"),

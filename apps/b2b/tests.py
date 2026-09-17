@@ -45,33 +45,10 @@ class PartnerPortalTests(PortalFixtures, APITestCase):
         return dict(email='NEW@phase.test', password='StrongAgency123!', password_confirm='StrongAgency123!',
                     first_name='New', last_name='Partner', company_name='New Agency', country='Italy', **extra)
 
-    def test_registration_and_after_commit_dispatch(self):
-        with patch('apps.b2b.tasks.deliver_partner_email.delay') as delay:
-            with self.captureOnCommitCallbacks(execute=True):
-                response = self.client.post('/api/v1/b2b/register/', self.registration(), format='json')
-            self.assertEqual(response.status_code, 201, response.data)
-            delay.assert_called_once()
-        user = get_user_model().objects.get(email='new@phase.test')
-        self.assertEqual(user.role, 'B2B_PARTNER')
-        self.assertFalse(user.b2b_profile.approved)
-        self.assertEqual(PartnerEmail.objects.count(), 1)
-        self.assertNotIn('password', response.json()['data'])
-
-    def test_registration_validation_and_case_insensitive_duplicate(self):
-        payload = self.registration()
-        payload['password_confirm'] = 'different'
-        self.assertEqual(self.client.post('/api/v1/b2b/register/', payload, format='json').status_code, 400)
-        payload = self.registration()
-        payload['email'] = 'AGENCY@phase.test'
-        self.assertEqual(self.client.post('/api/v1/b2b/register/', payload, format='json').status_code, 400)
-        self.assertEqual(PartnerEmail.objects.count(), 0)
-
-    def test_registration_rollback_on_outbox_failure(self):
-        before = get_user_model().objects.count()
-        with patch('apps.b2b.serializers.partner_serializers.queue_partner_email', side_effect=RuntimeError):
-            response = self.client.post('/api/v1/b2b/register/', self.registration(), format='json')
-        self.assertEqual(response.status_code, 500)
-        self.assertEqual(get_user_model().objects.count(), before)
+    def test_registration_disabled(self):
+        response = self.client.post('/api/v1/b2b/register/', self.registration(), format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['error']['code'], 'FORBIDDEN')
 
     def test_pending_profile_access_but_no_assets_or_ledger(self):
         B2BPartner.objects.filter(pk=self.partner.pk).update(approved=False)
@@ -172,10 +149,10 @@ class PartnerPortalTests(PortalFixtures, APITestCase):
         self.assertEqual(response.data['commission_paid_at'], timestamp)
 
     def test_outbox_survives_broker_failure(self):
+        from apps.b2b.tasks import queue_partner_email
         with patch('apps.b2b.tasks.deliver_partner_email.delay', side_effect=OSError('broker unavailable')):
             with self.captureOnCommitCallbacks(execute=True):
-                response = self.client.post('/api/v1/b2b/register/', self.registration(), format='json')
-        self.assertEqual(response.status_code, 201)
+                queue_partner_email('test@phase.test', 'Subject', 'Body')
         self.assertEqual(PartnerEmail.objects.filter(sent_at__isnull=True).count(), 1)
 
     @override_settings(RESEND_API_KEY='test-only-key')

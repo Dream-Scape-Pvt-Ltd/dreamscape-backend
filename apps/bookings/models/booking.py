@@ -1,3 +1,4 @@
+import uuid
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -26,6 +27,12 @@ class Booking(TimeStampedModel):
     booking_reference = models.CharField(
         max_length=30,
         unique=True,
+        db_index=True,
+    )
+    access_token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
         db_index=True,
     )
     customer_user = models.ForeignKey(

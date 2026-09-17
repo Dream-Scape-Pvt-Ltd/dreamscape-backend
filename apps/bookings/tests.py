@@ -232,7 +232,7 @@ class BookingAPITests(APITestCase):
         self.assertEqual(res_json["error"]["code"], "VALIDATION_ERROR")
 
     def test_booking_list_customer_isolation(self):
-        """Customer sees only their own bookings; Admin sees all bookings."""
+        """Customers/guests cannot list bookings (403); Admin sees all bookings."""
         # Booking for customer_user
         b1 = Booking.objects.create(
             booking_reference="DS-2026-CUST1",
@@ -262,15 +262,12 @@ class BookingAPITests(APITestCase):
 
         url = reverse("bookings:booking-list-create")
 
-        # As customer_user
+        # As customer_user -> 403 Forbidden
         self.client.force_authenticate(user=self.customer_user)
         res = self.client.get(url)
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        results = res.json()["data"]["results"]
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["booking_reference"], "DS-2026-CUST1")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-        # As Admin
+        # As Admin -> 200 OK
         self.client.force_authenticate(user=self.admin_user)
         res_admin = self.client.get(url)
         self.assertEqual(res_admin.status_code, status.HTTP_200_OK)
@@ -278,10 +275,9 @@ class BookingAPITests(APITestCase):
         self.assertEqual(len(admin_results), 2)
 
     def test_booking_detail_permissions(self):
-        """Owner and admin can retrieve booking detail; unauthorized customer gets 403."""
+        """Guest with access_token and admin can retrieve booking detail; missing/invalid token gets 403."""
         booking = Booking.objects.create(
             booking_reference="DS-2026-DETAIL1",
-            customer_user=self.customer_user,
             customer_name="John Doe",
             customer_email=self.customer_user.email,
             departure=self.departure,
@@ -294,21 +290,26 @@ class BookingAPITests(APITestCase):
 
         url = reverse("bookings:booking-detail", kwargs={"booking_reference": booking.booking_reference})
 
-        # Owner access -> 200
-        self.client.force_authenticate(user=self.customer_user)
-        res = self.client.get(url)
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.json()["data"]["booking_reference"], "DS-2026-DETAIL1")
+        # Unauthenticated guest with valid token -> 200 OK
+        self.client.logout()
+        res_token = self.client.get(f"{url}?token={booking.access_token}")
+        self.assertEqual(res_token.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_token.json()["data"]["booking_reference"], "DS-2026-DETAIL1")
+        self.assertEqual(res_token.json()["data"]["access_token"], str(booking.access_token))
 
-        # Admin access -> 200
+        # Admin access without token -> 200 OK
         self.client.force_authenticate(user=self.admin_user)
         res_admin = self.client.get(url)
         self.assertEqual(res_admin.status_code, status.HTTP_200_OK)
 
-        # Other customer -> 403 Forbidden
-        self.client.force_authenticate(user=self.other_customer)
-        res_other = self.client.get(url)
-        self.assertEqual(res_other.status_code, status.HTTP_403_FORBIDDEN)
+        # Unauthenticated guest without token -> 401 or 403
+        self.client.logout()
+        res_no_token = self.client.get(url)
+        self.assertIn(res_no_token.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+
+        # Unauthenticated guest with invalid token -> 401 or 403
+        res_bad_token = self.client.get(f"{url}?token=00000000-0000-0000-0000-000000000000")
+        self.assertIn(res_bad_token.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_booking_cancellation_restores_departure_seats(self):
         """Cancelling a booking updates status to CANCELLED and restores seats."""

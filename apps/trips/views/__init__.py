@@ -3,6 +3,7 @@ from .departure_views import (
     DepartureListCreateView,
 )
 from .expedition_views import ExpeditionDetailView
+from .highlight_views import TripHighlightView
 from .itinerary_views import (
     ItineraryDayDetailView,
     ItineraryView,
@@ -19,6 +20,7 @@ from .trip_views import (
 __all__ = [
     "TripListCreateView",
     "TripDetailView",
+    "TripHighlightView",
     "ItineraryView",
     "ItineraryDayDetailView",
     "DepartureListCreateView",

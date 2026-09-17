@@ -55,6 +55,8 @@ class TripListSerializer(serializers.ModelSerializer):
             "altitude_max_meters",
             "difficulty_grade",
             "is_featured",
+            "is_highlighted",
+            "highlight_order",
             "is_active",
             "rating_avg",
             "reviews_count",
@@ -194,6 +196,72 @@ class TripWriteSerializer(serializers.ModelSerializer):
             "single_supplement_usd",
             "overview",
             "is_featured",
+            "is_highlighted",
+            "highlight_order",
             "is_active",
         ]
         read_only_fields = ["id"]
+
+
+class TripHighlightUpdateSerializer(serializers.Serializer):
+    """
+    Validates selection of up to 5 highlighted treks/tours.
+    Accepts trip_ids (UUID) or trip_slugs (str).
+    """
+
+    trip_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        max_length=5,
+        min_length=1,
+        help_text="List of up to 5 trip UUIDs in desired highlight order."
+    )
+    trip_slugs = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        max_length=5,
+        min_length=1,
+        help_text="List of up to 5 trip slugs in desired highlight order."
+    )
+
+    def validate(self, attrs):
+        trip_ids = attrs.get("trip_ids")
+        trip_slugs = attrs.get("trip_slugs")
+
+        if not trip_ids and not trip_slugs:
+            raise serializers.ValidationError("Either 'trip_ids' or 'trip_slugs' must be provided.")
+
+        if trip_ids:
+            if len(trip_ids) > 5:
+                raise serializers.ValidationError({"trip_ids": "You can highlight at most 5 trips."})
+            if len(trip_ids) != len(set(trip_ids)):
+                raise serializers.ValidationError({"trip_ids": "Duplicate trip IDs are not allowed."})
+
+            trips = list(Trip.objects.filter(id__in=trip_ids, is_active=True))
+            found_ids = {trip.id for trip in trips}
+            missing = [str(tid) for tid in trip_ids if tid not in found_ids]
+            if missing:
+                raise serializers.ValidationError({
+                    "trip_ids": f"The following trip IDs were not found or are inactive: {', '.join(missing)}"
+                })
+            id_map = {trip.id: trip for trip in trips}
+            attrs["_resolved_trips"] = [id_map[tid] for tid in trip_ids]
+
+        elif trip_slugs:
+            if len(trip_slugs) > 5:
+                raise serializers.ValidationError({"trip_slugs": "You can highlight at most 5 trips."})
+            if len(trip_slugs) != len(set(trip_slugs)):
+                raise serializers.ValidationError({"trip_slugs": "Duplicate trip slugs are not allowed."})
+
+            trips = list(Trip.objects.filter(slug__in=trip_slugs, is_active=True))
+            found_slugs = {trip.slug for trip in trips}
+            missing = [slug for slug in trip_slugs if slug not in found_slugs]
+            if missing:
+                raise serializers.ValidationError({
+                    "trip_slugs": f"The following trip slugs were not found or are inactive: {', '.join(missing)}"
+                })
+            slug_map = {trip.slug: trip for trip in trips}
+            attrs["_resolved_trips"] = [slug_map[slug] for slug in trip_slugs]
+
+        return attrs
+

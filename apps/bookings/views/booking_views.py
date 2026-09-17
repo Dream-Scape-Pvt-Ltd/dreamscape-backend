@@ -12,25 +12,24 @@ from apps.bookings.serializers import (
     BookingListSerializer,
 )
 from apps.bookings.tasks import send_booking_confirmation_email
-from apps.common.permissions import IsOwnerOrAdmin
+from apps.common.permissions import HasBookingTokenOrAdmin, IsSalesAgentOrAdmin
 
 
 class BookingListCreateView(generics.ListCreateAPIView):
     """
     POST /api/v1/bookings/
         Initiate a booking checkout with atomic seat locking and split-payment calculation.
-        Permissions: AllowAny (unauthenticated guests may book; if authenticated, links customer_user).
+        Permissions: AllowAny (frictionless guest checkout).
 
     GET /api/v1/bookings/
         List bookings.
-        Permissions: IsAuthenticated.
-        Customers see only their own bookings; Admins and Sales Agents see all bookings.
+        Permissions: IsAuthenticated + IsSalesAgentOrAdmin (Administrative only).
     """
 
     def get_permissions(self):
         if self.request.method == "POST":
             return [AllowAny()]
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), IsSalesAgentOrAdmin()]
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -38,17 +37,10 @@ class BookingListCreateView(generics.ListCreateAPIView):
         return BookingListSerializer
 
     def get_queryset(self):
-        user = self.request.user
-        qs = (
+        return (
             Booking.objects.all()
             .select_related("departure__trip", "custom_trip", "customer_user")
             .order_by("-created_at")
-        )
-        if user.role in (UserRole.ADMIN, UserRole.SALES_AGENT):
-            return qs
-        # Filter normal customer to their own bookings
-        return qs.filter(
-            Q(customer_user=user) | Q(customer_email__iexact=user.email)
         )
 
     def create(self, request, *args, **kwargs):
@@ -71,10 +63,10 @@ class BookingDetailView(generics.RetrieveAPIView):
     """
     GET /api/v1/bookings/{booking_reference}/
         Retrieve full booking details including departure, passengers, and split-payment status.
-        Permissions: IsAuthenticated + IsOwnerOrAdmin.
+        Permissions: HasBookingTokenOrAdmin (requires ?token=<access_token> or admin JWT).
     """
 
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [HasBookingTokenOrAdmin]
     serializer_class = BookingDetailSerializer
     lookup_field = "booking_reference"
     lookup_url_kwarg = "booking_reference"
@@ -91,10 +83,10 @@ class BookingCancelView(generics.GenericAPIView):
     """
     PATCH /api/v1/bookings/{booking_reference}/cancel/
         Cancel a booking and atomically restore departure available seats.
-        Permissions: IsAuthenticated + IsOwnerOrAdmin.
+        Permissions: HasBookingTokenOrAdmin (requires ?token=<access_token> or admin JWT).
     """
 
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [HasBookingTokenOrAdmin]
     serializer_class = BookingCancelSerializer
     lookup_field = "booking_reference"
     lookup_url_kwarg = "booking_reference"

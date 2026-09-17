@@ -128,6 +128,11 @@ class LoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise serializers.ValidationError({"detail": "This user account is inactive."})
 
+        if not (user.is_staff or user.is_superuser or user.role in (UserRole.ADMIN, UserRole.SALES_AGENT)):
+            raise serializers.ValidationError({
+                "email": "Public customer accounts are disabled. Only administrative personnel may log in."
+            })
+
         refresh = RefreshToken.for_user(user)
         refresh["email"] = user.email
         refresh["role"] = user.role

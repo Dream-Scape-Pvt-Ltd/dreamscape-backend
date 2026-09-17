@@ -11,6 +11,7 @@ from .review_serializers import (
 from .trip_serializers import (
     PeakExpeditionDetailSerializer,
     TripDetailSerializer,
+    TripHighlightUpdateSerializer,
     TripListSerializer,
     TripWriteSerializer,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "TripListSerializer",
     "TripDetailSerializer",
     "TripWriteSerializer",
+    "TripHighlightUpdateSerializer",
     "PeakExpeditionDetailSerializer",
     "ItineraryDaySerializer",
     "TripDepartureSerializer",

@@ -23,41 +23,27 @@ from apps.common.throttling import (
 )
 
 
+from rest_framework.exceptions import PermissionDenied
+
+
 class RegisterView(APIView):
     """
-    Public customer account registration.
-    Creates a new user with CUSTOMER role and returns an access/refresh JWT token pair.
+    Public customer account registration is disabled.
+    Dreamscape Treks operates on a frictionless guest checkout model.
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [RegistrationThrottle]
 
     @extend_schema(
-        request=UserRegistrationSerializer,
         responses={
-            201: OpenApiResponse(description="Registration successful. Returns user profile and JWT pair."),
-            400: OpenApiResponse(description="Validation error (mismatched password or email in use)."),
+            403: OpenApiResponse(description="Public customer registration is disabled."),
         },
         tags=["Auth"],
     )
     def post(self, request):
-        serializer = UserRegistrationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-
-        refresh = RefreshToken.for_user(user)
-        refresh["email"] = user.email
-        refresh["role"] = user.role
-        refresh["full_name"] = user.full_name
-
-        data = {
-            "user": UserProfileSerializer(user).data,
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }
-        response = Response(data, status=status.HTTP_201_CREATED)
-        response.success_message = "Registration successful."
-        return response
+        raise PermissionDenied(
+            "Public customer registration is disabled. Travelers book expeditions directly via guest checkout."
+        )
 
 
 class LoginView(APIView):

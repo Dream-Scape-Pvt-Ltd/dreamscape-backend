@@ -190,6 +190,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "booking_reference",
+            "access_token",
             "customer_name",
             "customer_email",
             "customer_phone",

@@ -5,17 +5,17 @@ from rest_framework.response import Response
 
 from apps.bookings.models import Booking, PassengerDetail
 from apps.bookings.serializers import PassengerDetailSerializer
-from apps.common.permissions import IsOwnerOrAdmin
+from apps.common.permissions import HasBookingTokenOrAdmin
 
 
 class PassengerListView(generics.ListAPIView):
     """
     GET /api/v1/bookings/{booking_reference}/passengers/
         Retrieve manifest of all registered passengers for a specific booking.
-        Permissions: IsAuthenticated + IsOwnerOrAdmin (on parent booking).
+        Permissions: HasBookingTokenOrAdmin (requires ?token=<access_token> or admin JWT).
     """
 
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [HasBookingTokenOrAdmin]
     serializer_class = PassengerDetailSerializer
 
     def get_booking(self):
@@ -40,10 +40,10 @@ class PassengerDetailView(generics.RetrieveUpdateAPIView):
     PATCH /api/v1/bookings/{booking_reference}/passengers/{passenger_id}/
         Retrieve or partially update passenger details (passport, medical, insurance).
         Enforces minimum 6 months passport validity beyond trip start date on update.
-        Permissions: IsAuthenticated + IsOwnerOrAdmin (on passenger or parent booking).
+        Permissions: HasBookingTokenOrAdmin (requires ?token=<access_token> or admin JWT).
     """
 
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [HasBookingTokenOrAdmin]
     serializer_class = PassengerDetailSerializer
     lookup_field = "id"
     lookup_url_kwarg = "passenger_id"

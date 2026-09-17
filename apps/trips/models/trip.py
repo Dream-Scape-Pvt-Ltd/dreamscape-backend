@@ -45,6 +45,8 @@ class Trip(TimeStampedModel):
     single_supplement_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     overview = models.TextField()
     is_featured = models.BooleanField(default=False, db_index=True)
+    is_highlighted = models.BooleanField(default=False, db_index=True)
+    highlight_order = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:

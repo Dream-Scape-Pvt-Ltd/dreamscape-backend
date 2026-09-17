@@ -8,23 +8,23 @@ The hints describe the decision the answer will unlock. They are not requirement
 
 1. What is the single clearest promise Dreamscape Treks makes to a traveler?
    - Hint: one sentence, such as “small-group Himalayan treks with reliable local expertise.”
-   - **Answer:**
+   - **Answer:**small-group Himalayan treks with reliable local expertise.*
 
 2. Which countries and regions are in the first launch, and which are future expansion only?
    - Hint: separate Nepal, Tibet, Bhutan, India, and combined circuits.
-   - **Answer:**
+   - **Answer:**separate Nepal, Tibet, Bhutan, India, and combined circuits.
 
 3. Which products are available at launch: treks, expeditions, cultural tours, day hikes, activities, or all of them?
    - Hint: do not build management flows for products that will not be sold soon.
-   - **Answer:**
+   - **Answer:**trech and mountain expedition.
 
 4. Who is the primary customer at launch?
    - Hint: individual international traveler, domestic traveler, family/group organizer, agency, or a defined mix.
-   - **Answer:**
+   - **Answer:**international traveler.
 
 5. What makes Dreamscape different from competing trek operators?
    - Hint: guides, safety, pricing, comfort, sustainability, local access, customization, or something else.
-   - **Answer:**
+   - **Answer:**guides, comfort
 
 6. What is the launch date or launch window, and what must work on day one?
    - Hint: identify the smallest sellable release.

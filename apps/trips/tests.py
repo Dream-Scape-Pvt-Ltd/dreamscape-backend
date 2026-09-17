@@ -289,3 +289,188 @@ class TripCatalogTests(APITestCase):
         self.client.logout()
         final_get = self.client.get(exp_url)
         self.assertEqual(final_get.status_code, status.HTTP_200_OK)
+
+
+class TripHighlightTests(APITestCase):
+    """
+    Test suite for Trip Highlights endpoint (/api/v1/trips/highlights/).
+    Tests public retrieval (with featured fallback) and Admin curation of up to 5 trips.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="admin@dreamscapetreks.com",
+            password="SecureAdminPassword123!",
+            first_name="Admin",
+            last_name="Superuser",
+        )
+        self.customer = User.objects.create_user(
+            email="traveler@example.com",
+            password="SecurePassword123!",
+            first_name="Trekker",
+            last_name="User",
+            role=UserRole.CUSTOMER,
+        )
+        self.category = ActivityCategory.objects.create(
+            name="Classic Trekking",
+            slug="classic-trekking-hl",
+        )
+        self.destination = Destination.objects.create(
+            name="Everest Region",
+            slug="everest-region-hl",
+            country=DestinationCountry.NEPAL,
+            region_name="Khumbu",
+        )
+
+        # Create 6 active trips and 1 inactive trip
+        self.trips = []
+        for i in range(1, 7):
+            trip = Trip.objects.create(
+                destination=self.destination,
+                category=self.category,
+                title=f"Himalayan Trek {i}",
+                slug=f"himalayan-trek-{i}",
+                duration_days=10 + i,
+                altitude_max_meters=4000 + i * 200,
+                difficulty_grade=DifficultyGrade.GRADE_2,
+                min_group_size=2,
+                max_group_size=12,
+                starting_price_usd=1200.00 + i * 100,
+                overview=f"Overview for Trek {i}",
+                is_featured=(i <= 3),  # First 3 are featured
+                is_active=True,
+            )
+            self.trips.append(trip)
+
+        self.inactive_trip = Trip.objects.create(
+            destination=self.destination,
+            category=self.category,
+            title="Inactive Trek",
+            slug="inactive-trek",
+            duration_days=5,
+            altitude_max_meters=3000,
+            difficulty_grade=DifficultyGrade.GRADE_1,
+            starting_price_usd=800.00,
+            overview="Not currently active.",
+            is_active=False,
+        )
+
+        self.highlights_url = reverse("trips:trip-highlights")
+
+    def test_get_highlights_fallback_to_featured(self):
+        """When no trips are explicitly highlighted, fallback to featured trips."""
+        response = self.client.get(self.highlights_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()["data"]
+        self.assertEqual(len(data), 3)  # 3 featured trips
+        slugs = [t["slug"] for t in data]
+        self.assertIn("himalayan-trek-1", slugs)
+        self.assertIn("himalayan-trek-2", slugs)
+        self.assertIn("himalayan-trek-3", slugs)
+
+    def test_admin_set_highlights_up_to_5_trips(self):
+        """Admin can curate up to 5 highlighted trips in specific display order."""
+        self.client.force_authenticate(user=self.admin)
+        selected_ids = [str(t.id) for t in self.trips[:5]]
+
+        payload = {"trip_ids": selected_ids}
+        response = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()["data"]
+        self.assertEqual(len(data), 5)
+        # Verify order and is_highlighted
+        for idx, item in enumerate(data, start=1):
+            self.assertTrue(item["is_highlighted"])
+            self.assertEqual(item["highlight_order"], idx)
+            self.assertEqual(item["id"], selected_ids[idx - 1])
+
+        # Verify public GET returns these 5 highlights
+        self.client.logout()
+        get_res = self.client.get(self.highlights_url)
+        self.assertEqual(get_res.status_code, status.HTTP_200_OK)
+        get_data = get_res.json()["data"]
+        self.assertEqual(len(get_data), 5)
+        self.assertEqual([t["id"] for t in get_data], selected_ids)
+
+    def test_admin_set_highlights_using_slugs(self):
+        """Admin can curate highlighted trips using trip slugs."""
+        self.client.force_authenticate(user=self.admin)
+        selected_slugs = [self.trips[4].slug, self.trips[2].slug, self.trips[0].slug]
+
+        payload = {"trip_slugs": selected_slugs}
+        response = self.client.post(self.highlights_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()["data"]
+        self.assertEqual(len(data), 3)
+        self.assertEqual(data[0]["slug"], self.trips[4].slug)
+        self.assertEqual(data[0]["highlight_order"], 1)
+        self.assertEqual(data[1]["slug"], self.trips[2].slug)
+        self.assertEqual(data[1]["highlight_order"], 2)
+        self.assertEqual(data[2]["slug"], self.trips[0].slug)
+        self.assertEqual(data[2]["highlight_order"], 3)
+
+    def test_reject_more_than_5_trips(self):
+        """Attempting to highlight more than 5 trips triggers validation error."""
+        self.client.force_authenticate(user=self.admin)
+        payload = {"trip_ids": [str(t.id) for t in self.trips[:6]]}  # 6 trips
+
+        response = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        error = response.json()["error"]
+        self.assertTrue("5" in str(error) and "trip_ids" in str(error))
+
+    def test_reject_duplicate_trips(self):
+        """Duplicate trips in payload are rejected."""
+        self.client.force_authenticate(user=self.admin)
+        duplicate_ids = [str(self.trips[0].id), str(self.trips[0].id)]
+        payload = {"trip_ids": duplicate_ids}
+
+        response = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reject_inactive_trip(self):
+        """Inactive trips cannot be highlighted."""
+        self.client.force_authenticate(user=self.admin)
+        payload = {"trip_ids": [str(self.inactive_trip.id)]}
+
+        response = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_permissions_unauthenticated_and_customer(self):
+        """Unauthenticated and customer requests cannot modify highlights."""
+        payload = {"trip_ids": [str(self.trips[0].id)]}
+
+        # Anonymous
+        anon_res = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(anon_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Customer
+        self.client.force_authenticate(user=self.customer)
+        cust_res = self.client.put(self.highlights_url, payload, format="json")
+        self.assertEqual(cust_res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_highlight_replacement_cleans_old_highlights(self):
+        """Updating highlights completely replaces previous highlight assignments."""
+        self.client.force_authenticate(user=self.admin)
+
+        # Initial set: trip 0 and trip 1
+        self.client.put(self.highlights_url, {"trip_ids": [str(self.trips[0].id), str(self.trips[1].id)]}, format="json")
+        self.assertEqual(Trip.objects.filter(is_highlighted=True).count(), 2)
+
+        # Replace with trip 3
+        self.client.put(self.highlights_url, {"trip_ids": [str(self.trips[3].id)]}, format="json")
+        self.assertEqual(Trip.objects.filter(is_highlighted=True).count(), 1)
+
+        self.trips[0].refresh_from_db()
+        self.trips[1].refresh_from_db()
+        self.trips[3].refresh_from_db()
+
+        self.assertFalse(self.trips[0].is_highlighted)
+        self.assertIsNone(self.trips[0].highlight_order)
+        self.assertFalse(self.trips[1].is_highlighted)
+        self.assertIsNone(self.trips[1].highlight_order)
+        self.assertTrue(self.trips[3].is_highlighted)
+        self.assertEqual(self.trips[3].highlight_order, 1)
+

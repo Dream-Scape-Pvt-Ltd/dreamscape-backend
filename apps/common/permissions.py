@@ -102,3 +102,55 @@ class IsOwnerAgentOrAdmin(BasePermission):
         if hasattr(obj, "customer_user"):
             return obj.customer_user == request.user
         return False
+
+
+class HasBookingTokenOrAdmin(BasePermission):
+    """
+    Grants access if:
+    1. Caller is an authenticated ADMIN or SALES_AGENT.
+    2. Caller provides a valid 'token' (matching booking.access_token)
+       via query param '?token=...' or header 'X-Booking-Token'.
+    3. Or legacy authenticated customer matching booking.customer_user / email.
+    """
+
+    message = "Valid booking access token or admin authorization required."
+
+    def _get_token(self, request):
+        return request.query_params.get("token") or request.headers.get("X-Booking-Token")
+
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated and request.user.role in (UserRole.ADMIN, UserRole.SALES_AGENT):
+            return True
+        if request.user and request.user.is_authenticated:
+            return True
+        # For guest, require token in request
+        token = self._get_token(request)
+        if not token:
+            return False
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if request.user and request.user.is_authenticated and request.user.role in (UserRole.ADMIN, UserRole.SALES_AGENT):
+            return True
+
+        token = self._get_token(request)
+        if token:
+            token_str = str(token).strip()
+            if hasattr(obj, "access_token") and str(obj.access_token) == token_str:
+                return True
+            if hasattr(obj, "booking") and hasattr(obj.booking, "access_token") and str(obj.booking.access_token) == token_str:
+                return True
+
+        if request.user and request.user.is_authenticated:
+            if hasattr(obj, "customer_user") and obj.customer_user == request.user:
+                return True
+            if hasattr(obj, "customer_email") and request.user.email and obj.customer_email.lower() == request.user.email.lower():
+                return True
+            if hasattr(obj, "booking"):
+                if obj.booking.customer_user == request.user:
+                    return True
+                if request.user.email and obj.booking.customer_email and obj.booking.customer_email.lower() == request.user.email.lower():
+                    return True
+
+        return False
+

@@ -38,7 +38,7 @@ class AuthEndpointTests(APITestCase):
             last_name="Superuser",
         )
 
-    def test_register_success(self):
+    def test_register_disabled_returns_403(self):
         url = reverse("auth:auth-register")
         payload = {
             "email": "edmund@example.com",
@@ -49,49 +49,15 @@ class AuthEndpointTests(APITestCase):
             "phone": "+6491234567",
         }
         response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        res = response.json()
-        self.assertTrue(res["success"])
-        self.assertIn("access", res["data"])
-        self.assertIn("refresh", res["data"])
-        self.assertEqual(res["data"]["user"]["email"], "edmund@example.com")
-        self.assertEqual(res["data"]["user"]["role"], UserRole.CUSTOMER)
-        self.assertEqual(res["message"], "Registration successful.")
-
-    def test_register_password_mismatch(self):
-        url = reverse("auth:auth-register")
-        payload = {
-            "email": "mismatch@example.com",
-            "password": "SecurePassword123!",
-            "password_confirm": "DifferentPassword123!",
-            "first_name": "Mismatch",
-            "last_name": "User",
-        }
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         res = response.json()
         self.assertFalse(res["success"])
-        self.assertEqual(res["error"]["code"], "VALIDATION_ERROR")
-        self.assertIn("password_confirm", res["error"]["details"])
+        self.assertEqual(res["error"]["code"], "FORBIDDEN")
 
-    def test_register_duplicate_email(self):
-        url = reverse("auth:auth-register")
-        payload = {
-            "email": "trekker@example.com",  # Already exists in setUp
-            "password": "SecurePassword123!",
-            "password_confirm": "SecurePassword123!",
-            "first_name": "Duplicate",
-            "last_name": "User",
-        }
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        res = response.json()
-        self.assertFalse(res["success"])
-
-    def test_login_success(self):
+    def test_login_success_admin(self):
         url = reverse("auth:auth-login")
         payload = {
-            "email": "trekker@example.com",
+            "email": self.admin.email,
             "password": self.password,
         }
         response = self.client.post(url, payload, format="json")
@@ -100,13 +66,26 @@ class AuthEndpointTests(APITestCase):
         self.assertTrue(res["success"])
         self.assertIn("access", res["data"])
         self.assertIn("refresh", res["data"])
-        self.assertEqual(res["data"]["user"]["email"], "trekker@example.com")
+        self.assertEqual(res["data"]["user"]["email"], self.admin.email)
+        self.assertEqual(res["data"]["user"]["role"], UserRole.ADMIN)
         self.assertEqual(res["message"], "Login successful.")
+
+    def test_login_customer_rejected(self):
+        url = reverse("auth:auth-login")
+        payload = {
+            "email": self.customer.email,
+            "password": self.password,
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        res = response.json()
+        self.assertFalse(res["success"])
+        self.assertIn("Public customer accounts are disabled", str(res["error"]["details"]))
 
     def test_login_invalid_password(self):
         url = reverse("auth:auth-login")
         payload = {
-            "email": "trekker@example.com",
+            "email": self.admin.email,
             "password": "WrongPassword123!",
         }
         response = self.client.post(url, payload, format="json")
@@ -116,12 +95,12 @@ class AuthEndpointTests(APITestCase):
         self.assertEqual(res["error"]["code"], "VALIDATION_ERROR")
 
     def test_login_inactive_user(self):
-        self.customer.is_active = False
-        self.customer.save()
+        self.admin.is_active = False
+        self.admin.save()
 
         url = reverse("auth:auth-login")
         payload = {
-            "email": "trekker@example.com",
+            "email": self.admin.email,
             "password": self.password,
         }
         response = self.client.post(url, payload, format="json")
@@ -130,7 +109,7 @@ class AuthEndpointTests(APITestCase):
         self.assertFalse(res["success"])
 
     def test_token_refresh(self):
-        refresh = RefreshToken.for_user(self.customer)
+        refresh = RefreshToken.for_user(self.admin)
         url = reverse("auth:token-refresh")
         response = self.client.post(url, {"refresh": str(refresh)}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -140,8 +119,8 @@ class AuthEndpointTests(APITestCase):
         self.assertEqual(res["message"], "Token refreshed successfully.")
 
     def test_logout_blacklists_token(self):
-        refresh = RefreshToken.for_user(self.customer)
-        self.client.force_authenticate(user=self.customer)
+        refresh = RefreshToken.for_user(self.admin)
+        self.client.force_authenticate(user=self.admin)
 
         logout_url = reverse("auth:auth-logout")
         response = self.client.post(logout_url, {"refresh": str(refresh)}, format="json")
@@ -157,7 +136,7 @@ class AuthEndpointTests(APITestCase):
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_password_change_success(self):
-        self.client.force_authenticate(user=self.customer)
+        self.client.force_authenticate(user=self.admin)
         url = reverse("auth:password-change")
         new_password = "NewSuperPassword987#"
         payload = {
@@ -172,11 +151,11 @@ class AuthEndpointTests(APITestCase):
         self.assertEqual(res["message"], "Password changed successfully.")
 
         # Verify new password allows login
-        self.customer.refresh_from_db()
-        self.assertTrue(self.customer.check_password(new_password))
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password(new_password))
 
     def test_password_change_wrong_current(self):
-        self.client.force_authenticate(user=self.customer)
+        self.client.force_authenticate(user=self.admin)
         url = reverse("auth:password-change")
         payload = {
             "current_password": "IncorrectPassword!",
@@ -191,15 +170,15 @@ class AuthEndpointTests(APITestCase):
     def test_password_reset_flow(self):
         # 1. Request reset
         request_url = reverse("auth:password-reset")
-        req_response = self.client.post(request_url, {"email": self.customer.email}, format="json")
+        req_response = self.client.post(request_url, {"email": self.admin.email}, format="json")
         self.assertEqual(req_response.status_code, status.HTTP_200_OK)
         res_req = req_response.json()
         self.assertTrue(res_req["success"])
         self.assertEqual(len(mail.outbox), 1)
 
         # 2. Confirm reset with token
-        uid = urlsafe_base64_encode(force_bytes(self.customer.pk))
-        token = default_token_generator.make_token(self.customer)
+        uid = urlsafe_base64_encode(force_bytes(self.admin.pk))
+        token = default_token_generator.make_token(self.admin)
 
         confirm_url = reverse("auth:password-reset-confirm")
         new_pass = "BrandNewPassword123!"
@@ -216,7 +195,7 @@ class AuthEndpointTests(APITestCase):
 
         # Verify user can log in with new password
         login_url = reverse("auth:auth-login")
-        login_response = self.client.post(login_url, {"email": self.customer.email, "password": new_pass}, format="json")
+        login_response = self.client.post(login_url, {"email": self.admin.email, "password": new_pass}, format="json")
         self.assertEqual(login_response.status_code, status.HTTP_200_OK)
 
 
