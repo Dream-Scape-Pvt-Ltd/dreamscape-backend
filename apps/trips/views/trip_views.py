@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Avg, Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -8,7 +9,7 @@ from rest_framework.response import Response
 
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import TripFilter
-from apps.trips.models import Trip
+from apps.trips.models import Trip, ItineraryDay
 from apps.trips.serializers import (
     TripDetailSerializer,
     TripListSerializer,
@@ -68,9 +69,33 @@ class TripListCreateView(generics.ListCreateAPIView):
         },
     )
     def post(self, request, *args, **kwargs):
+        itinerary_data = request.data.get("itinerary_days", None)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        trip = serializer.save()
+        with transaction.atomic():
+            trip = serializer.save()
+            if itinerary_data is not None and isinstance(itinerary_data, list):
+                new_days = []
+                for idx, day_info in enumerate(itinerary_data, start=1):
+                    if not isinstance(day_info, dict):
+                        continue
+                    new_days.append(
+                        ItineraryDay(
+                            trip=trip,
+                            day_number=day_info.get("day_number", idx),
+                            title=day_info.get("title", f"Day {idx}"),
+                            description=day_info.get("description", ""),
+                            overnight_stay=day_info.get("overnight_stay", ""),
+                            elevation_meters=day_info.get("elevation_meters") if day_info.get("elevation_meters") is not None and str(day_info.get("elevation_meters")).strip() != "" else None,
+                            accommodation_type=day_info.get("accommodation_type") or "TEAHOUSE",
+                            is_acclimatization_day=bool(day_info.get("is_acclimatization_day", False)),
+                            meals_included=day_info.get("meals_included", []),
+                            latitude=day_info.get("latitude") or None,
+                            longitude=day_info.get("longitude") or None,
+                        )
+                    )
+                if new_days:
+                    ItineraryDay.objects.bulk_create(new_days)
         output_serializer = TripDetailSerializer(trip)
         response = Response(output_serializer.data, status=status.HTTP_201_CREATED)
         response.success_message = "Trip created successfully."
@@ -125,9 +150,34 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def patch(self, request, *args, **kwargs):
         instance = self.get_object()
+        itinerary_data = request.data.get("itinerary_days", None)
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        trip = serializer.save()
+        with transaction.atomic():
+            trip = serializer.save()
+            if itinerary_data is not None and isinstance(itinerary_data, list):
+                instance.itinerary_days.all().delete()
+                new_days = []
+                for idx, day_info in enumerate(itinerary_data, start=1):
+                    if not isinstance(day_info, dict):
+                        continue
+                    new_days.append(
+                        ItineraryDay(
+                            trip=trip,
+                            day_number=day_info.get("day_number", idx),
+                            title=day_info.get("title", f"Day {idx}"),
+                            description=day_info.get("description", ""),
+                            overnight_stay=day_info.get("overnight_stay", ""),
+                            elevation_meters=day_info.get("elevation_meters") if day_info.get("elevation_meters") is not None and str(day_info.get("elevation_meters")).strip() != "" else None,
+                            accommodation_type=day_info.get("accommodation_type") or "TEAHOUSE",
+                            is_acclimatization_day=bool(day_info.get("is_acclimatization_day", False)),
+                            meals_included=day_info.get("meals_included", []),
+                            latitude=day_info.get("latitude") or None,
+                            longitude=day_info.get("longitude") or None,
+                        )
+                    )
+                if new_days:
+                    ItineraryDay.objects.bulk_create(new_days)
         output_serializer = TripDetailSerializer(trip)
         response = Response(output_serializer.data, status=status.HTTP_200_OK)
         response.success_message = "Trip updated successfully."

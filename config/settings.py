@@ -261,3 +261,8 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 5.0,
     },
 }
+
+# Administrative security: Django admin session expires when browser closes
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 3600  # 1 hour max session
+

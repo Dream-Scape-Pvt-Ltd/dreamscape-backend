@@ -44,6 +44,8 @@ class Trip(TimeStampedModel):
     starting_price_usd = models.DecimalField(max_digits=12, decimal_places=2, db_index=True)
     single_supplement_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     overview = models.TextField()
+    hero_image_url = models.CharField(max_length=500, blank=True, default="")
+    gallery_images = models.JSONField(default=list, blank=True)
     is_featured = models.BooleanField(default=False, db_index=True)
     is_highlighted = models.BooleanField(default=False, db_index=True)
     highlight_order = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
