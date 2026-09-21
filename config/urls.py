@@ -50,6 +50,7 @@ urlpatterns = [
     path("api/v1/content/", include("apps.content_cms.urls")),
     path("api/v1/faqs/", include("apps.faq.urls")),
     path("api/v1/search/", include("apps.search.urls")),
+    path("api/v1/analytics/", include("apps.common.analytics_urls")),
 
     # -----------------------------------------------------------------------
     # API Documentation (drf-spectacular)
