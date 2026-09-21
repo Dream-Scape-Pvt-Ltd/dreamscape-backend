@@ -5,11 +5,12 @@ from apps.common.models.base import TimeStampedModel
 
 
 class GuideCategory(models.TextChoices):
-    VISAS = "VISAS", "Visas & Entry Guidelines"
-    PERMITS = "PERMITS", "Trekking Permits & TIMS"
-    ALTITUDE = "ALTITUDE", "Altitude Sickness & Acclimatization"
-    CULTURE = "CULTURE", "Local Culture & Etiquette"
-    BEST_TIME = "BEST_TIME", "Best Season & Weather Guide"
+    ADVENTURE = "ADVENTURE", "Adventure"
+    TRAVEL_TIPS = "TRAVEL_TIPS", "Travel Tips"
+    CULTURE = "CULTURE", "Culture"
+    NATURE = "NATURE", "Nature"
+    FOOD = "FOOD", "Food"
+    OTHER = "OTHER", "Other"
 
 
 class TravelGuide(TimeStampedModel):
@@ -42,11 +43,13 @@ class TravelGuide(TimeStampedModel):
     )
     markdown_content = models.TextField()
     hero_image_url = models.URLField(max_length=500, blank=True)
+    gallery_images = models.JSONField(default=list, blank=True)
     meta_title = models.CharField(max_length=255, blank=True)
     meta_description = models.CharField(max_length=500, blank=True)
     canonical_url = models.URLField(max_length=500, blank=True)
     is_published = models.BooleanField(default=False, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
+    view_count = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         db_table = "travel_guides"
@@ -63,3 +66,30 @@ class TravelGuide(TimeStampedModel):
 
     def __str__(self):
         return f"{self.title} ({self.category})"
+
+
+class BlogComment(TimeStampedModel):
+    guide = models.ForeignKey(
+        TravelGuide,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="blog_comments",
+    )
+    author_name = models.CharField(max_length=255)
+    body = models.TextField()
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "blog_comments"
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["guide", "is_active", "created_at"], name="blog_comment_list_idx"),
+        ]
+
+    def __str__(self):
+        return f"Comment by {self.author_name} on {self.guide.title}"

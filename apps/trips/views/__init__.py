@@ -14,12 +14,14 @@ from .review_views import (
 )
 from .trip_views import (
     TripDetailView,
+    TripImageUploadView,
     TripListCreateView,
 )
 
 __all__ = [
     "TripListCreateView",
     "TripDetailView",
+    "TripImageUploadView",
     "TripHighlightView",
     "ItineraryView",
     "ItineraryDayDetailView",

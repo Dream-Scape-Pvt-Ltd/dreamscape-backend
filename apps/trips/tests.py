@@ -1,10 +1,15 @@
 import datetime
+import io
+import tempfile
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import UserRole
+from apps.common.models import MediaAsset
 from apps.destinations.models import ActivityCategory, Destination, DestinationCountry
 from apps.trips.models import (
     AccommodationType,
@@ -162,6 +167,39 @@ class TripCatalogTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         res = response.json()
         self.assertFalse(res["success"])
+
+    def test_admin_can_upload_trek_images(self):
+        self.client.force_authenticate(user=self.admin)
+        image_bytes = io.BytesIO()
+        Image.new("RGB", (24, 16), color=(32, 96, 64)).save(image_bytes, format="PNG")
+        upload = SimpleUploadedFile(
+            "everest-cover.png",
+            image_bytes.getvalue(),
+            content_type="image/png",
+        )
+
+        with tempfile.TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse("trips:trip-image-upload"),
+                {"files": [upload]},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(len(payload["data"]["files"]), 1)
+        self.assertIn("/media/media/", payload["data"]["files"][0]["url"])
+        self.assertEqual(MediaAsset.objects.count(), 1)
+
+    def test_customer_cannot_upload_trek_images(self):
+        self.client.force_authenticate(user=self.customer)
+        response = self.client.post(
+            reverse("trips:trip-image-upload"),
+            {},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_get_trip_detail_with_schema_org(self):
         url = reverse("trips:trip-detail", kwargs={"slug": self.trip.slug})
@@ -473,4 +511,3 @@ class TripHighlightTests(APITestCase):
         self.assertIsNone(self.trips[1].highlight_order)
         self.assertTrue(self.trips[3].is_highlighted)
         self.assertEqual(self.trips[3].highlight_order, 1)
-

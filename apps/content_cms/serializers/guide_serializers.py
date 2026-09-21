@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.conf import settings
+from django.utils.text import slugify
 
-from apps.content_cms.models import TravelGuide
+from apps.content_cms.models import BlogComment, TravelGuide
 from apps.destinations.models import Destination
 
 
@@ -16,6 +17,33 @@ class GuideAuthorSerializer(serializers.Serializer):
     full_name = serializers.CharField(read_only=True)
 
 
+class BlogCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BlogComment
+        fields = ["id", "author_name", "body", "created_at"]
+        read_only_fields = fields
+
+
+class BlogCommentCreateSerializer(serializers.Serializer):
+    body = serializers.CharField(max_length=2000, trim_whitespace=True)
+
+    def validate_body(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Please enter a comment.")
+        return value.strip()
+
+
+class GuideImageUploadSerializer(serializers.Serializer):
+    file = serializers.ImageField()
+
+    def validate_file(self, value):
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("Each image must be 10 MB or smaller.")
+        if value.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            raise serializers.ValidationError("Upload a JPG, PNG, or WebP image.")
+        return value
+
+
 class TravelGuideListSerializer(serializers.ModelSerializer):
     """
     Serializer for guide index and cards.
@@ -23,6 +51,7 @@ class TravelGuideListSerializer(serializers.ModelSerializer):
     """
 
     destination = GuideDestinationSerializer(read_only=True)
+    comment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = TravelGuide
@@ -35,10 +64,17 @@ class TravelGuideListSerializer(serializers.ModelSerializer):
             "country",
             "region",
             "hero_image_url",
+            "gallery_images",
             "is_published",
             "published_at",
+            "updated_at",
+            "view_count",
+            "comment_count",
         ]
         read_only_fields = fields
+
+    def get_comment_count(self, obj) -> int:
+        return obj.comments.filter(is_active=True).count()
 
 
 class TravelGuideDetailSerializer(serializers.ModelSerializer):
@@ -52,6 +88,8 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
     schema_org_article = serializers.SerializerMethodField()
     schema_org_breadcrumb = serializers.SerializerMethodField()
     schema_org = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = TravelGuide
@@ -66,11 +104,15 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
             "category",
             "markdown_content",
             "hero_image_url",
+            "gallery_images",
             "meta_title",
             "meta_description",
             "canonical_url",
             "is_published",
             "published_at",
+            "view_count",
+            "comment_count",
+            "comments",
             "schema_org_article",
             "schema_org_breadcrumb",
             "schema_org",
@@ -79,13 +121,19 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_comments(self, obj):
+        return BlogCommentSerializer(obj.comments.filter(is_active=True), many=True).data
+
+    def get_comment_count(self, obj) -> int:
+        return obj.comments.filter(is_active=True).count()
+
     def get_schema_org_article(self, obj) -> dict:
         return {
             "@context": "https://schema.org",
             "@type": "Article",
             "headline": obj.title,
             "description": obj.meta_description or obj.markdown_content[:200],
-            "image": [obj.hero_image_url] if obj.hero_image_url else [],
+            "image": ([obj.hero_image_url] if obj.hero_image_url else []) + list(obj.gallery_images or []),
             "datePublished": obj.published_at.isoformat() if obj.published_at else None,
             "dateModified": obj.updated_at.isoformat(),
             "author": {
@@ -116,9 +164,22 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
 
 
 class TravelGuideWriteSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(required=False, allow_blank=True, max_length=255)
+
     class Meta:
         model = TravelGuide
         fields = ['id', 'destination', 'author', 'title', 'slug', 'country', 'region', 'category',
-                  'markdown_content', 'hero_image_url', 'meta_title', 'meta_description',
+                  'markdown_content', 'hero_image_url', 'gallery_images', 'meta_title', 'meta_description',
                   'canonical_url', 'is_published', 'published_at']
         read_only_fields = ['id', 'author', 'published_at']
+
+    def create(self, validated_data):
+        if not validated_data.get("slug"):
+            base = slugify(validated_data["title"])[:240] or "blog-post"
+            candidate = base
+            suffix = 2
+            while TravelGuide.objects.filter(slug=candidate).exists():
+                candidate = f"{base[:240 - len(str(suffix))]}-{suffix}"
+                suffix += 1
+            validated_data["slug"] = candidate
+        return super().create(validated_data)

@@ -1,7 +1,14 @@
+import io
+import tempfile
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.urls import reverse
+from PIL import Image
 from rest_framework.test import APITestCase
 from apps.common.testing import PortalFixtures
-from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative
+from apps.common.models import MediaAsset
+from apps.content_cms.models import BlogComment, TravelGuide, ResponsibleTravelInitiative
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -10,16 +17,16 @@ class ContentAPITests(PortalFixtures, APITestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.guide = TravelGuide.objects.create(title='Everest permits', slug='everest-permits', country='NEPAL',
-            category='PERMITS', markdown_content='Everest permits guide', destination=cls.destination,
+            category='TRAVEL_TIPS', markdown_content='Everest permits guide', destination=cls.destination,
             author=cls.admin, is_published=True)
         cls.draft = TravelGuide.objects.create(title='Draft', slug='draft', country='NEPAL',
-            category='PERMITS', markdown_content='Draft content')
+            category='TRAVEL_TIPS', markdown_content='Draft content')
         cls.initiative = ResponsibleTravelInitiative.objects.create(title='Porter welfare', slug='porter-welfare',
             pillars=['Welfare'], content='Support porters', is_published=True)
         ResponsibleTravelInitiative.objects.create(title='Draft pledge', slug='draft-pledge', content='Draft')
 
     def test_public_catalog_filters_and_draft_visibility(self):
-        response = self.client.get('/api/v1/content/guides/?country=NEPAL&category=PERMITS&destination=everest-nepal&search=Everest')
+        response = self.client.get('/api/v1/content/guides/?country=NEPAL&category=TRAVEL_TIPS&destination=everest-nepal&search=Everest')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['destination']['slug'], self.destination.slug)
@@ -37,13 +44,16 @@ class ContentAPITests(PortalFixtures, APITestCase):
         self.assertNotIn('email', response.data['author'])
 
     def test_admin_create_publish_unpublish_republish_preserves_date(self):
-        payload = {'title': 'New guide', 'slug': 'new-guide', 'country': 'NEPAL', 'category': 'CULTURE',
-                   'markdown_content': 'Culture', 'is_published': False}
+        payload = {'title': 'New guide', 'country': 'NEPAL', 'category': 'CULTURE',
+                   'markdown_content': 'Culture', 'gallery_images': ['https://example.com/story.jpg'], 'is_published': False}
         self.client.force_authenticate(self.customer)
-        self.assertEqual(self.client.post('/api/v1/content/guides/', payload).status_code, 403)
+        self.assertEqual(self.client.post('/api/v1/content/guides/', payload, format='json').status_code, 403)
         self.client.force_authenticate(self.admin)
-        response = self.client.post('/api/v1/content/guides/', payload)
+        response = self.client.post('/api/v1/content/guides/', payload, format='json')
         self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['slug'], 'new-guide')
+        self.assertEqual(response.data['gallery_images'], ['https://example.com/story.jpg'])
+        self.assertTrue(TravelGuide.objects.filter(slug='new-guide', gallery_images=['https://example.com/story.jpg']).exists())
         self.assertIsNone(response.data['published_at'])
         path = '/api/v1/content/guides/new-guide/'
         response = self.client.patch(path, {'is_published': True})
@@ -60,6 +70,56 @@ class ContentAPITests(PortalFixtures, APITestCase):
         path = '/api/v1/content/guides/everest-permits/'
         self.assertEqual(self.client.patch(path, {'title': 'Changed'}).status_code, 403)
         self.assertEqual(self.client.delete(path).status_code, 403)
+
+    def test_published_blog_view_is_counted(self):
+        path = '/api/v1/content/guides/everest-permits/view/'
+        first = self.client.post(path)
+        second = self.client.post(path)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.data['view_count'], 2)
+        self.guide.refresh_from_db()
+        self.assertEqual(self.guide.view_count, 2)
+        self.assertEqual(self.client.post('/api/v1/content/guides/draft/view/').status_code, 404)
+
+    def test_signed_in_customer_can_comment_and_admin_can_remove_comment(self):
+        path = '/api/v1/content/guides/everest-permits/comments/'
+        self.assertEqual(self.client.post(path, {'body': 'A useful article.'}, format='json').status_code, 401)
+
+        self.client.force_authenticate(self.customer)
+        response = self.client.post(path, {'body': 'A useful article.'}, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        comment_id = response.data['id']
+        self.client.force_authenticate(None)
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['body'], 'A useful article.')
+
+        detail = self.client.get('/api/v1/content/guides/everest-permits/')
+        self.assertEqual(detail.data['comment_count'], 1)
+        self.assertEqual(len(detail.data['comments']), 1)
+
+        self.client.force_authenticate(self.admin)
+        delete_path = f'/api/v1/content/guides/everest-permits/comments/{comment_id}/'
+        self.assertEqual(self.client.delete(delete_path).status_code, 204)
+        self.assertFalse(BlogComment.objects.get(id=comment_id).is_active)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(path).data, [])
+
+    def test_admin_can_upload_blog_images(self):
+        self.client.force_authenticate(self.admin)
+        image_bytes = io.BytesIO()
+        Image.new('RGB', (24, 16), color=(32, 96, 64)).save(image_bytes, format='PNG')
+        upload = SimpleUploadedFile('blog-cover.png', image_bytes.getvalue(), content_type='image/png')
+        with tempfile.TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse('content_cms:guide-image-upload'),
+                {'files': [upload]},
+                format='multipart',
+            )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(len(response.data['files']), 1)
+        self.assertIn('/media/media/', response.data['files'][0]['url'])
+        self.assertEqual(MediaAsset.objects.count(), 1)
 
     def test_responsible_travel_public_and_admin_creation(self):
         response = self.client.get('/api/v1/content/responsible-travel/')

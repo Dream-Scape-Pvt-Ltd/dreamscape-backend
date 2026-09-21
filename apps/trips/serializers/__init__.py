@@ -12,6 +12,7 @@ from .trip_serializers import (
     PeakExpeditionDetailSerializer,
     TripDetailSerializer,
     TripHighlightUpdateSerializer,
+    TripImageUploadSerializer,
     TripListSerializer,
     TripWriteSerializer,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "TripDetailSerializer",
     "TripWriteSerializer",
     "TripHighlightUpdateSerializer",
+    "TripImageUploadSerializer",
     "PeakExpeditionDetailSerializer",
     "ItineraryDaySerializer",
     "TripDepartureSerializer",

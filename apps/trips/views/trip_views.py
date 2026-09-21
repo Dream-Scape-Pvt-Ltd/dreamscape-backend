@@ -3,18 +3,68 @@ from django.db.models import Avg, Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import generics, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from apps.common.models import MediaAsset
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import TripFilter
 from apps.trips.models import Trip, ItineraryDay
 from apps.trips.serializers import (
     TripDetailSerializer,
     TripListSerializer,
+    TripImageUploadSerializer,
     TripWriteSerializer,
 )
+
+
+class TripImageUploadView(APIView):
+    """Upload cover and gallery images for the admin trek editor."""
+
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(tags=["Trips Admin"], request=TripImageUploadSerializer)
+    def post(self, request, *args, **kwargs):
+        files = request.FILES.getlist("files")
+        if not files:
+            return Response(
+                {"files": ["Select at least one image."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(files) > 12:
+            return Response(
+                {"files": ["Upload no more than 12 images at once."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uploaded = []
+        for image in files:
+            serializer = TripImageUploadSerializer(data={"file": image})
+            serializer.is_valid(raise_exception=True)
+            valid_image = serializer.validated_data["file"]
+            asset = MediaAsset.objects.create(
+                file=valid_image,
+                original_name=valid_image.name[:255],
+                mime_type=valid_image.content_type,
+                file_size_bytes=valid_image.size,
+                uploaded_by=request.user,
+            )
+            uploaded.append(
+                {
+                    "id": str(asset.id),
+                    "url": request.build_absolute_uri(asset.file.url),
+                    "name": asset.original_name,
+                    "size": asset.file_size_bytes,
+                }
+            )
+
+        response = Response({"files": uploaded}, status=status.HTTP_201_CREATED)
+        response.success_message = "Trek image upload completed."
+        return response
 
 
 class TripListCreateView(generics.ListCreateAPIView):

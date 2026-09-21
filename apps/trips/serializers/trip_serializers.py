@@ -209,6 +209,19 @@ class TripWriteSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class TripImageUploadSerializer(serializers.Serializer):
+    """Validate a public trek cover or gallery image upload."""
+
+    file = serializers.ImageField()
+
+    def validate_file(self, value):
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("Each image must be 10 MB or smaller.")
+        if value.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            raise serializers.ValidationError("Upload a JPG, PNG, or WebP image.")
+        return value
+
+
 class TripHighlightUpdateSerializer(serializers.Serializer):
     """
     Validates selection of up to 5 highlighted treks/tours.
@@ -270,4 +283,3 @@ class TripHighlightUpdateSerializer(serializers.Serializer):
             attrs["_resolved_trips"] = [slug_map[slug] for slug in trip_slugs]
 
         return attrs
-

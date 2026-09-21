@@ -1,12 +1,19 @@
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from apps.content_cms.models import TravelGuide
+from apps.common.models import MediaAsset
+from apps.common.permissions import IsAdminRole
+from apps.content_cms.models import BlogComment, TravelGuide
 from apps.content_cms.serializers.guide_serializers import (
-    TravelGuideListSerializer, TravelGuideDetailSerializer, TravelGuideWriteSerializer,
+    BlogCommentCreateSerializer, BlogCommentSerializer, GuideImageUploadSerializer, TravelGuideListSerializer,
+    TravelGuideDetailSerializer, TravelGuideWriteSerializer,
 )
 from .permissions import IsAdminOrReadOnly, is_editor
 
@@ -57,3 +64,85 @@ class TravelGuideDetailView(GuideQuerysetMixin, generics.RetrieveUpdateDestroyAP
 
     def perform_destroy(self, instance):
         TravelGuide.objects.filter(pk=instance.pk).update(is_published=False, updated_at=timezone.now())
+
+
+class GuideViewCountView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, slug):
+        updated = TravelGuide.objects.filter(slug=slug, is_published=True).update(view_count=F("view_count") + 1)
+        if not updated:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        view_count = TravelGuide.objects.values_list("view_count", flat=True).get(slug=slug)
+        return Response({"view_count": view_count})
+
+
+class GuideImageUploadView(APIView):
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        files = request.FILES.getlist("files")
+        if not files:
+            return Response({"files": ["Select at least one image."]}, status=status.HTTP_400_BAD_REQUEST)
+        if len(files) > 12:
+            return Response({"files": ["Upload no more than 12 images at once."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded = []
+        for image in files:
+            serializer = GuideImageUploadSerializer(data={"file": image})
+            serializer.is_valid(raise_exception=True)
+            valid_image = serializer.validated_data["file"]
+            asset = MediaAsset.objects.create(
+                file=valid_image,
+                original_name=valid_image.name[:255],
+                mime_type=valid_image.content_type,
+                file_size_bytes=valid_image.size,
+                uploaded_by=request.user,
+            )
+            uploaded.append({
+                "id": str(asset.id),
+                "url": request.build_absolute_uri(asset.file.url),
+                "name": asset.original_name,
+                "size": asset.file_size_bytes,
+            })
+        return Response({"files": uploaded}, status=status.HTTP_201_CREATED)
+
+
+class GuideCommentListCreateView(APIView):
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get_guide(self, slug):
+        return generics.get_object_or_404(TravelGuide, slug=slug, is_published=True)
+
+    def get(self, request, slug):
+        comments = self.get_guide(slug).comments.filter(is_active=True)
+        return Response(BlogCommentSerializer(comments, many=True).data)
+
+    def post(self, request, slug):
+        guide = self.get_guide(slug)
+        serializer = BlogCommentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        comment = BlogComment.objects.create(
+            guide=guide,
+            user=request.user,
+            author_name=request.user.full_name or request.user.email,
+            body=serializer.validated_data["body"],
+        )
+        return Response(BlogCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+class GuideCommentDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+    http_method_names = ["delete", "options"]
+
+    def delete(self, request, slug, comment_id):
+        if not is_editor(request.user):
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        updated = BlogComment.objects.filter(id=comment_id, guide__slug=slug, is_active=True).update(
+            is_active=False, updated_at=timezone.now()
+        )
+        if not updated:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
