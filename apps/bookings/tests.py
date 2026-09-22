@@ -70,7 +70,6 @@ class BookingAPITests(APITestCase):
             end_date=self.end_date,
             price_usd=Decimal("1500.00"),
             max_seats=10,
-            available_seats=10,
             status=DepartureStatus.LIMITED,
         )
 
@@ -165,7 +164,8 @@ class BookingAPITests(APITestCase):
 
     def test_booking_rejection_insufficient_seats(self):
         """Booking fails with 409 SEATS_UNAVAILABLE if departure lacks seats."""
-        self.departure.available_seats = 1
+        # 9 of 10 seats taken leaves exactly one available.
+        self.departure.booked_seats = 9
         self.departure.save()
 
         passenger_2 = dict(self.passenger_payload_1)
@@ -191,8 +191,9 @@ class BookingAPITests(APITestCase):
         self.assertEqual(self.departure.available_seats, 1)
 
     def test_booking_marks_departure_sold_out_when_seats_reach_zero(self):
-        """Departure status transitions to SOLD_OUT when available_seats becomes 0."""
-        self.departure.available_seats = 1
+        """Departure status transitions when the last seat is taken."""
+        self.departure.booked_seats = 9
+        self.departure.waitlist_enabled = False
         self.departure.save()
 
         url = reverse("bookings:booking-list-create")
@@ -313,8 +314,8 @@ class BookingAPITests(APITestCase):
 
     def test_booking_cancellation_restores_departure_seats(self):
         """Cancelling a booking updates status to CANCELLED and restores seats."""
-        # Start with 5 seats
-        self.departure.available_seats = 5
+        # Start with 5 of 10 seats taken, so 5 are available.
+        self.departure.booked_seats = 5
         self.departure.save()
 
         booking = Booking.objects.create(
@@ -342,9 +343,10 @@ class BookingAPITests(APITestCase):
         self.assertEqual(data["status"], BookingStatus.CANCELLED)
         self.assertEqual(data["cancellation_reason"], "Family emergency, unable to travel.")
 
-        # Departure seats restored from 5 to 7
+        # Departure seats restored from 5 available to 7
         self.departure.refresh_from_db()
         self.assertEqual(self.departure.available_seats, 7)
+        self.assertEqual(self.departure.booked_seats, 3)
 
         # Attempt to cancel again should fail
         res_again = self.client.patch(url, payload, format="json")

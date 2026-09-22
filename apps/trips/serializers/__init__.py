@@ -1,4 +1,5 @@
 from .departure_serializers import (
+    DepartureCapacitySerializer,
     TripDepartureSerializer,
     TripDepartureWriteSerializer,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "ItineraryDaySerializer",
     "TripDepartureSerializer",
     "TripDepartureWriteSerializer",
+    "DepartureCapacitySerializer",
     "TripReviewReadSerializer",
     "TripReviewCreateSerializer",
     "TripReviewModerationSerializer",

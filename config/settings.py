@@ -257,10 +257,32 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_BROKER_CONNECTION_TIMEOUT = 2
 CELERY_TASK_PUBLISH_RETRY = False
+CRM_SLA_HOURS = env.int('CRM_SLA_HOURS', default=4)
+
+# Hours a waitlisted traveller has to claim an offered seat before the offer
+# lapses and the next entry in the queue is served.
+WAITLIST_OFFER_TTL_HOURS = env.int('WAITLIST_OFFER_TTL_HOURS', default=48)
+
 CELERY_BEAT_SCHEDULE = {
     'deliver-partner-email-outbox': {
         'task': 'apps.b2b.tasks.dispatch_pending_partner_emails',
         'schedule': 5.0,
+    },
+    'crm-check-sla-breaches': {
+        'task': 'apps.inquiries.tasks.check_sla_breaches',
+        'schedule': 1800.0,  # every 30 minutes
+    },
+    'crm-send-task-reminders': {
+        'task': 'apps.inquiries.tasks.send_task_reminders',
+        'schedule': 900.0,  # every 15 minutes
+    },
+    'crm-nightly-customer-rollup': {
+        'task': 'apps.inquiries.tasks.nightly_customer_rollup',
+        'schedule': 86400.0,  # daily
+    },
+    'bookings-expire-waitlist-offers': {
+        'task': 'apps.bookings.tasks.expire_waitlist_offers',
+        'schedule': 900.0,  # every 15 minutes
     },
 }
 

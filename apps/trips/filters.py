@@ -1,6 +1,6 @@
 import django_filters
-from django.db.models import Q
-from apps.trips.models import DifficultyGrade, Trip
+from django.db.models import F, Q
+from apps.trips.models import DepartureStatus, DifficultyGrade, Trip, TripDeparture
 
 
 class TripFilter(django_filters.FilterSet):
@@ -49,3 +49,61 @@ class TripFilter(django_filters.FilterSet):
             return queryset
         # JSONField containment check for season string (e.g., 'Spring', 'Autumn')
         return queryset.filter(best_seasons__icontains=value.strip())
+
+
+class DepartureCapacityFilter(django_filters.FilterSet):
+    """
+    Cross-trip filter for the admin capacity board.
+
+    Expects a queryset already passed through
+    ``TripDepartureQuerySet.with_capacity_counts()`` — ``capacity_state``
+    filters on the ``seats_left`` and ``open_inquiry_count`` annotations.
+    """
+
+    trip = django_filters.CharFilter(field_name="trip__slug", lookup_expr="iexact")
+    destination = django_filters.CharFilter(
+        field_name="trip__destination__slug", lookup_expr="iexact"
+    )
+    status = django_filters.ChoiceFilter(choices=DepartureStatus.choices)
+    start_after = django_filters.DateFilter(field_name="start_date", lookup_expr="gte")
+    start_before = django_filters.DateFilter(field_name="start_date", lookup_expr="lte")
+    capacity_state = django_filters.ChoiceFilter(
+        choices=[
+            ("HEALTHY", "Healthy"),
+            ("NEARLY_FULL", "Nearly Full"),
+            ("FULL", "Full"),
+            ("OVERSUBSCRIBED", "Oversubscribed"),
+        ],
+        method="filter_by_capacity_state",
+    )
+
+    class Meta:
+        model = TripDeparture
+        fields = [
+            "trip",
+            "destination",
+            "status",
+            "start_after",
+            "start_before",
+            "capacity_state",
+        ]
+
+    def filter_by_capacity_state(self, queryset, name, value):
+        # Mirrors DepartureCapacitySerializer.get_capacity_state. Oversubscribed
+        # is checked first there too, so the two orderings agree.
+        oversubscribed = Q(
+            open_inquiry_count__gt=F("max_seats") - F("booked_seats") - F("reserved_seats")
+        )
+        if value == "OVERSUBSCRIBED":
+            return queryset.filter(oversubscribed)
+        if value == "FULL":
+            return queryset.filter(seats_left__lte=0).exclude(oversubscribed)
+        if value == "NEARLY_FULL":
+            return queryset.filter(
+                seats_left__gt=0, seats_left__lte=F("few_seats_threshold")
+            ).exclude(oversubscribed)
+        if value == "HEALTHY":
+            return queryset.filter(seats_left__gt=F("few_seats_threshold")).exclude(
+                oversubscribed
+            )
+        return queryset

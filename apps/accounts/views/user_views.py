@@ -5,11 +5,13 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts.models import UserRole
 from apps.accounts.serializers.user_serializers import (
     UserAdminSerializer,
+    UserMinimalSerializer,
     UserProfileSerializer,
 )
-from apps.common.permissions import IsAdminRole
+from apps.common.permissions import IsAdminRole, IsSalesAgentOrAdmin
 
 User = get_user_model()
 
@@ -83,6 +85,48 @@ class UserListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         response = super().get(request, *args, **kwargs)
         response.success_message = "User list retrieved successfully."
+        return response
+
+
+class AgentListView(generics.ListAPIView):
+    """
+    GET /api/v1/users/agents/
+        Staff who can own a CRM lead, for assignee pickers.
+        Permissions: IsSalesAgentOrAdmin.
+
+    Deliberately separate from UserListView: an agent needs to populate a
+    dropdown without being handed the full admin user record.
+    """
+
+    permission_classes = [IsSalesAgentOrAdmin]
+    serializer_class = UserMinimalSerializer
+    pagination_class = None
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ["email", "first_name", "last_name"]
+    ordering_fields = ["first_name", "last_name", "email"]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return User.objects.none()
+        qs = User.objects.filter(
+            role__in=[UserRole.ADMIN, UserRole.SALES_AGENT],
+            is_active=True,
+        )
+        role = self.request.query_params.get("role")
+        if role:
+            qs = qs.filter(role=role.upper())
+        return qs.order_by("first_name", "last_name", "email")
+
+    @extend_schema(
+        tags=["Users"],
+        responses={
+            200: UserMinimalSerializer(many=True),
+            403: OpenApiResponse(description="Forbidden: staff role required."),
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        response.success_message = "Agent list retrieved successfully."
         return response
 
 

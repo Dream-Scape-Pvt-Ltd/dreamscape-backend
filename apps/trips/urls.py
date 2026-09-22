@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.trips.views import (
+    DepartureCapacityListView,
     DepartureDetailView,
     DepartureListCreateView,
     ExpeditionDetailView,
@@ -20,6 +21,7 @@ urlpatterns = [
     path("", TripListCreateView.as_view(), name="trip-list"),
     path("highlights/", TripHighlightView.as_view(), name="trip-highlights"),
     path("media/upload/", TripImageUploadView.as_view(), name="trip-image-upload"),
+    path("departures/", DepartureCapacityListView.as_view(), name="departure-capacity-board"),
     path("<slug:slug>/itinerary/", ItineraryView.as_view(), name="trip-itinerary"),
     path("<slug:slug>/itinerary/<int:day_number>/", ItineraryDayDetailView.as_view(), name="itinerary-day"),
     path("<slug:slug>/departures/", DepartureListCreateView.as_view(), name="departure-list"),

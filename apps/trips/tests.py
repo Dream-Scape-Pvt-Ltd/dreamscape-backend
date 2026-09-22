@@ -93,7 +93,7 @@ class TripCatalogTests(APITestCase):
             end_date=self.today + datetime.timedelta(days=44),
             price_usd=1650.00,
             max_seats=12,
-            available_seats=10,
+            booked_seats=2,  # leaves 10 available
             status=DepartureStatus.GUARANTEED,
             is_guaranteed=True,
         )
@@ -259,13 +259,14 @@ class TripCatalogTests(APITestCase):
             "end_date": str(self.today + datetime.timedelta(days=74)),
             "price_usd": "1700.00",
             "max_seats": 14,
-            "available_seats": 14,
             "status": DepartureStatus.LIMITED,
         }
         post_response = self.client.post(list_url, payload, format="json")
         self.assertEqual(post_response.status_code, status.HTTP_201_CREATED)
         res_post = post_response.json()
         self.assertEqual(res_post["data"]["max_seats"], 14)
+        # A brand-new departure has no bookings, so every seat is available.
+        self.assertEqual(res_post["data"]["available_seats"], 14)
 
     def test_review_submission_and_moderation(self):
         reviews_url = reverse("trips:review-list", kwargs={"slug": self.trip.slug})

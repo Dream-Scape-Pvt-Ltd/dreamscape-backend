@@ -1,9 +1,10 @@
 from django.db.models import Avg
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.destinations.serializers.category_serializers import ActivityCategorySerializer
 from apps.destinations.serializers.destination_serializers import DestinationListSerializer
-from apps.trips.models import PeakExpeditionDetail, Trip
+from apps.trips.models import DepartureStatus, PeakExpeditionDetail, Trip
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
 from apps.trips.serializers.itinerary_serializers import ItineraryDaySerializer
 from apps.trips.serializers.review_serializers import TripReviewReadSerializer
@@ -130,7 +131,14 @@ class TripDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_departures(self, obj):
-        departures = obj.departures.filter(available_seats__gt=0).order_by("start_date")[:10]
+        # Full and waitlist-only batches are included deliberately: the public
+        # tour page shows "Batch full - join waitlist" rather than hiding the
+        # date. Only cancelled departures are withheld.
+        departures = (
+            obj.departures.filter(start_date__gte=timezone.localdate())
+            .exclude(status=DepartureStatus.CANCELLED)
+            .order_by("start_date")[:10]
+        )
         return TripDepartureSerializer(departures, many=True).data
 
     def get_reviews(self, obj):

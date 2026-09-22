@@ -1,14 +1,44 @@
 from django.urls import path
 from apps.inquiries.views import (
-    InquiryListCreateView,
+    ActivityListCreateView,
+    BulkAssignView,
+    CustomerDetailView,
+    FunnelView,
+    LeadAssignmentRuleDetailView,
+    LeadAssignmentRuleListCreateView,
+    LeadsByDepartureView,
     InquiryDetailUpdateView,
+    InquiryListCreateView,
     InquiryNoteListCreateView,
+    InquiryTagView,
+    InquiryTimelineView,
+    MyTasksView,
+    PipelineSummaryView,
+    TagListCreateView,
+    TaskDetailUpdateView,
+    TaskListCreateView,
 )
 
 app_name = "inquiries"
 
 urlpatterns = [
     path("", InquiryListCreateView.as_view(), name="inquiry-list-create"),
+    path("tags/", TagListCreateView.as_view(), name="tag-list-create"),
+    path("tasks/mine/", MyTasksView.as_view(), name="my-tasks"),
+    path("tasks/<uuid:pk>/", TaskDetailUpdateView.as_view(), name="task-detail"),
+    path("crm/pipeline-summary/", PipelineSummaryView.as_view(), name="crm-pipeline-summary"),
+    path("crm/funnel/", FunnelView.as_view(), name="crm-funnel"),
+    path("crm/customers/<str:email>/", CustomerDetailView.as_view(), name="crm-customer-detail"),
+    path("crm/by-departure/", LeadsByDepartureView.as_view(), name="crm-leads-by-departure"),
+    path("crm/assignment-rules/", LeadAssignmentRuleListCreateView.as_view(), name="crm-assignment-rules"),
+    path("crm/assignment-rules/<uuid:pk>/", LeadAssignmentRuleDetailView.as_view(), name="crm-assignment-rule-detail"),
+    # Must precede <str:inquiry_number>/, which would match "bulk-assign".
+    path("bulk-assign/", BulkAssignView.as_view(), name="crm-bulk-assign"),
     path("<str:inquiry_number>/", InquiryDetailUpdateView.as_view(), name="inquiry-detail"),
     path("<str:inquiry_number>/notes/", InquiryNoteListCreateView.as_view(), name="inquiry-notes"),
+    path("<str:inquiry_number>/timeline/", InquiryTimelineView.as_view(), name="inquiry-timeline"),
+    path("<str:inquiry_number>/activities/", ActivityListCreateView.as_view(), name="inquiry-activities"),
+    path("<str:inquiry_number>/tasks/", TaskListCreateView.as_view(), name="inquiry-tasks"),
+    path("<str:inquiry_number>/tags/", InquiryTagView.as_view(), name="inquiry-tags"),
+    path("<str:inquiry_number>/tags/<uuid:tag_id>/", InquiryTagView.as_view(), name="inquiry-tag-detail"),
 ]

@@ -5,6 +5,7 @@ from .booking_serializers import (
     BookingCancelSerializer,
 )
 from .passenger_serializers import PassengerDetailSerializer
+from .waitlist_serializers import WaitlistEntrySerializer, WaitlistJoinSerializer
 
 __all__ = [
     "BookingCreateSerializer",
@@ -12,4 +13,6 @@ __all__ = [
     "BookingListSerializer",
     "BookingCancelSerializer",
     "PassengerDetailSerializer",
+    "WaitlistEntrySerializer",
+    "WaitlistJoinSerializer",
 ]

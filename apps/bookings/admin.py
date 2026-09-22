@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.bookings.models import Booking, PassengerDetail
+from apps.bookings.models import Booking, DepartureWaitlistEntry, PassengerDetail
 
 
 class PassengerDetailInline(admin.StackedInline):
@@ -32,6 +32,22 @@ class BookingAdmin(admin.ModelAdmin):
     search_fields = ("booking_reference", "customer_name", "customer_email")
     readonly_fields = ("booking_reference", "created_at", "updated_at")
     inlines = [PassengerDetailInline]
+
+
+@admin.register(DepartureWaitlistEntry)
+class DepartureWaitlistEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "position",
+        "customer_name",
+        "customer_email",
+        "num_travelers",
+        "departure",
+        "status",
+        "offer_expires_at",
+    )
+    list_filter = ("status", "departure__trip")
+    search_fields = ("customer_name", "customer_email", "departure__trip__title")
+    readonly_fields = ("position", "offered_at", "offer_expires_at", "created_at", "updated_at")
 
 
 @admin.register(PassengerDetail)

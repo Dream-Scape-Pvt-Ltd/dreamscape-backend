@@ -18,7 +18,21 @@ class ItineraryDayInline(admin.TabularInline):
 class TripDepartureInline(admin.TabularInline):
     model = TripDeparture
     extra = 1
-    fields = ("start_date", "end_date", "price_usd", "max_seats", "available_seats", "status", "is_guaranteed")
+    # booked_seats is read-only here: it belongs to the booking flow, which
+    # mutates it under a row lock. Capacity is adjusted via max/reserved seats.
+    fields = (
+        "start_date",
+        "end_date",
+        "price_usd",
+        "max_seats",
+        "reserved_seats",
+        "booked_seats",
+        "status",
+        "status_locked",
+        "waitlist_enabled",
+        "is_guaranteed",
+    )
+    readonly_fields = ("booked_seats",)
 
 
 class PeakExpeditionDetailInline(admin.StackedInline):
@@ -38,9 +52,21 @@ class TripAdmin(admin.ModelAdmin):
 
 @admin.register(TripDeparture)
 class TripDepartureAdmin(admin.ModelAdmin):
-    list_display = ("trip", "start_date", "end_date", "price_usd", "available_seats", "max_seats", "status", "is_guaranteed")
-    list_filter = ("status", "is_guaranteed", "start_date")
+    list_display = (
+        "trip",
+        "start_date",
+        "end_date",
+        "price_usd",
+        "available_seats",
+        "booked_seats",
+        "reserved_seats",
+        "max_seats",
+        "status",
+        "is_guaranteed",
+    )
+    list_filter = ("status", "status_locked", "waitlist_enabled", "is_guaranteed", "start_date")
     search_fields = ("trip__title",)
+    readonly_fields = ("booked_seats", "available_seats")
 
 
 @admin.register(TripReview)

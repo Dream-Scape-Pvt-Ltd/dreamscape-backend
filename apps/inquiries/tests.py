@@ -3,12 +3,24 @@ from datetime import date, timedelta
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import UserRole
 from apps.destinations.models import Destination, ActivityCategory, DestinationCountry
-from apps.inquiries.models import Inquiry, InquiryNote, InquiryStatus, InquiryType, TailorMadeRequest
+from apps.inquiries.models import (
+    Activity,
+    ActivityChannel,
+    Customer,
+    Inquiry,
+    InquiryNote,
+    InquiryStatus,
+    InquiryType,
+    Tag,
+    Task,
+    TailorMadeRequest,
+)
 from apps.trips.models import DifficultyGrade, DepartureStatus, Trip, TripDeparture
 
 User = get_user_model()
@@ -68,7 +80,6 @@ class InquiryAPITests(APITestCase):
             end_date=self.start_date + timedelta(days=16),
             price_usd=Decimal("1800.00"),
             max_seats=12,
-            available_seats=12,
             status=DepartureStatus.GUARANTEED,
         )
 
@@ -296,3 +307,263 @@ class InquiryAPITests(APITestCase):
         notes = res_list.json()["data"]["results"]
         self.assertEqual(len(notes), 1)
         self.assertEqual(notes[0]["note_text"], note_payload["note_text"])
+
+
+class CRMExpansionAPITests(APITestCase):
+    """
+    Covers the CRM expansion: Customer dedup, Activity timeline, Task
+    follow-ups, lost-reason enforcement, tagging, and pipeline/funnel
+    analytics endpoints.
+    """
+
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            email="admin@dreamscapetreks.com",
+            password="AdminPassword123!",
+            first_name="Admin",
+            last_name="User",
+            role=UserRole.ADMIN,
+            is_staff=True,
+        )
+        self.agent_user = User.objects.create_user(
+            email="agent@dreamscapetreks.com",
+            password="AgentPassword123!",
+            first_name="Karma",
+            last_name="Sherpa",
+            role=UserRole.SALES_AGENT,
+            is_staff=True,
+        )
+        self.other_agent = User.objects.create_user(
+            email="agent2@dreamscapetreks.com",
+            password="AgentPassword123!",
+            first_name="Pemba",
+            last_name="Sherpa",
+            role=UserRole.SALES_AGENT,
+            is_staff=True,
+        )
+        self.customer_user = User.objects.create_user(
+            email="traveler@example.com",
+            password="TravelerPass123!",
+            first_name="John",
+            last_name="Doe",
+            role=UserRole.CUSTOMER,
+        )
+
+    def test_inquiry_creation_deduplicates_into_customer(self):
+        """Two inquiries from the same (case-varied) email dedupe into one Customer."""
+        url = reverse("inquiries:inquiry-list-create")
+        payload = {
+            "inquiry_type": InquiryType.GENERAL,
+            "full_name": "Priya Shah",
+            "email": "Priya.Shah@example.com",
+            "message": "First inquiry.",
+        }
+        res1 = self.client.post(url, payload, format="json")
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+
+        payload2 = dict(payload, email="priya.shah@example.com", message="Second inquiry, different case email.")
+        res2 = self.client.post(url, payload2, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+
+        self.assertEqual(Customer.objects.filter(email="priya.shah@example.com").count(), 1)
+        customer = Customer.objects.get(email="priya.shah@example.com")
+        self.assertEqual(customer.lifetime_inquiries, 2)
+        self.assertEqual(customer.inquiries.count(), 2)
+
+    def test_activity_logging_stamps_first_response(self):
+        """Logging a CALL activity stamps Inquiry.first_response_at exactly once."""
+        inquiry = Inquiry.objects.create(
+            inquiry_number="INQ-2026-3001",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Amara Okafor",
+            email="amara@example.com",
+            status=InquiryStatus.NEW,
+        )
+        self.assertIsNone(inquiry.first_response_at)
+
+        url = reverse("inquiries:inquiry-activities", kwargs={"inquiry_number": inquiry.inquiry_number})
+        self.client.force_authenticate(user=self.agent_user)
+
+        res = self.client.post(url, {"channel": ActivityChannel.CALL, "body": "Called to discuss dates."}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        inquiry.refresh_from_db()
+        self.assertIsNotNone(inquiry.first_response_at)
+        first_stamp = inquiry.first_response_at
+
+        # A second outreach activity must not move the timestamp.
+        res2 = self.client.post(url, {"channel": ActivityChannel.EMAIL, "body": "Sent itinerary PDF."}, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+        inquiry.refresh_from_db()
+        self.assertEqual(inquiry.first_response_at, first_stamp)
+
+        # Manually creating a STATUS_CHANGE activity via the API is rejected.
+        res3 = self.client.post(url, {"channel": ActivityChannel.STATUS_CHANGE, "body": "nope"}, format="json")
+        self.assertEqual(res3.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_status_patch_creates_status_change_activity(self):
+        """PATCHing Inquiry.status auto-logs a STATUS_CHANGE Activity."""
+        inquiry = Inquiry.objects.create(
+            inquiry_number="INQ-2026-3002",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Deshi Wang",
+            email="deshi@example.com",
+            status=InquiryStatus.NEW,
+        )
+        url = reverse("inquiries:inquiry-detail", kwargs={"inquiry_number": inquiry.inquiry_number})
+        self.client.force_authenticate(user=self.agent_user)
+
+        res = self.client.patch(url, {"status": InquiryStatus.ASSIGNED}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        activity = Activity.objects.get(inquiry=inquiry, channel=ActivityChannel.STATUS_CHANGE)
+        self.assertEqual(activity.metadata["from_status"], InquiryStatus.NEW)
+        self.assertEqual(activity.metadata["to_status"], InquiryStatus.ASSIGNED)
+
+    def test_closing_inquiry_requires_lost_reason(self):
+        """Closing an unconverted inquiry without a lost_reason is rejected."""
+        inquiry = Inquiry.objects.create(
+            inquiry_number="INQ-2026-3003",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Fatima Noor",
+            email="fatima@example.com",
+            status=InquiryStatus.IN_CONTACT,
+        )
+        url = reverse("inquiries:inquiry-detail", kwargs={"inquiry_number": inquiry.inquiry_number})
+        self.client.force_authenticate(user=self.agent_user)
+
+        res_missing = self.client.patch(url, {"status": InquiryStatus.CLOSED}, format="json")
+        self.assertEqual(res_missing.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("lost_reason", res_missing.json()["error"]["details"])
+
+        res_ok = self.client.patch(
+            url, {"status": InquiryStatus.CLOSED, "lost_reason": "PRICE"}, format="json"
+        )
+        self.assertEqual(res_ok.status_code, status.HTTP_200_OK)
+        inquiry.refresh_from_db()
+        self.assertEqual(inquiry.status, InquiryStatus.CLOSED)
+        self.assertEqual(inquiry.lost_reason, "PRICE")
+
+    def test_task_creation_and_my_tasks_panel(self):
+        """Agents can schedule follow-up tasks and list their own open tasks."""
+        inquiry = Inquiry.objects.create(
+            inquiry_number="INQ-2026-3004",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Otto Reyes",
+            email="otto@example.com",
+            status=InquiryStatus.ASSIGNED,
+            assigned_agent=self.agent_user,
+        )
+        tasks_url = reverse("inquiries:inquiry-tasks", kwargs={"inquiry_number": inquiry.inquiry_number})
+        self.client.force_authenticate(user=self.agent_user)
+
+        due_at = (timezone.now() + timedelta(days=2)).isoformat()
+        res_create = self.client.post(tasks_url, {"title": "Call back about dates", "due_at": due_at}, format="json")
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+
+        task = Task.objects.get(inquiry=inquiry)
+        self.assertEqual(task.assigned_agent, self.agent_user)
+
+        # Task shows up on the creating agent's "My Tasks" panel...
+        mine_url = reverse("inquiries:my-tasks")
+        res_mine = self.client.get(mine_url)
+        self.assertEqual(res_mine.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res_mine.json()["data"]["results"]), 1)
+
+        # ...but not on another agent's panel.
+        self.client.force_authenticate(user=self.other_agent)
+        res_other = self.client.get(mine_url)
+        self.assertEqual(len(res_other.json()["data"]["results"]), 0)
+
+        # Mark the task done.
+        task = Task.objects.get(inquiry=inquiry)
+        detail_url = reverse("inquiries:task-detail", kwargs={"pk": task.id})
+        self.client.force_authenticate(user=self.agent_user)
+        res_done = self.client.patch(detail_url, {"status": "DONE"}, format="json")
+        self.assertEqual(res_done.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertEqual(task.status, "DONE")
+        self.assertIsNotNone(task.completed_at)
+
+    def test_tag_attach_and_detach(self):
+        inquiry = Inquiry.objects.create(
+            inquiry_number="INQ-2026-3005",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Grace Kim",
+            email="grace@example.com",
+            status=InquiryStatus.NEW,
+        )
+        tag = Tag.objects.create(name="budget-sensitive")
+
+        url = reverse("inquiries:inquiry-tags", kwargs={"inquiry_number": inquiry.inquiry_number})
+        self.client.force_authenticate(user=self.agent_user)
+
+        res_add = self.client.post(url, {"tag_id": str(tag.id)}, format="json")
+        self.assertEqual(res_add.status_code, status.HTTP_200_OK)
+        self.assertEqual(inquiry.tags.count(), 1)
+
+        detail_url = reverse("inquiries:inquiry-tag-detail", kwargs={"inquiry_number": inquiry.inquiry_number, "tag_id": str(tag.id)})
+        res_remove = self.client.delete(detail_url)
+        self.assertEqual(res_remove.status_code, status.HTTP_200_OK)
+        self.assertEqual(inquiry.tags.count(), 0)
+
+    def test_pipeline_summary_and_funnel_endpoints(self):
+        Inquiry.objects.create(
+            inquiry_number="INQ-2026-3006",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Lead A",
+            email="leada@example.com",
+            status=InquiryStatus.NEW,
+        )
+        Inquiry.objects.create(
+            inquiry_number="INQ-2026-3007",
+            inquiry_type=InquiryType.GENERAL,
+            full_name="Lead B",
+            email="leadb@example.com",
+            status=InquiryStatus.CLOSED,
+            lost_reason="PRICE",
+        )
+
+        self.client.force_authenticate(user=self.admin_user)
+
+        res_summary = self.client.get(reverse("inquiries:crm-pipeline-summary"))
+        self.assertEqual(res_summary.status_code, status.HTTP_200_OK)
+        summary = res_summary.json()["data"]
+        self.assertEqual(summary["by_status"]["NEW"], 1)
+        self.assertEqual(summary["by_status"]["CLOSED"], 1)
+
+        res_funnel = self.client.get(reverse("inquiries:crm-funnel"))
+        self.assertEqual(res_funnel.status_code, status.HTTP_200_OK)
+        funnel = res_funnel.json()["data"]
+        self.assertEqual(funnel["total_leads"], 2)
+        self.assertEqual(funnel["closed_lost"], 1)
+        self.assertEqual(funnel["lost_reasons"]["PRICE"], 1)
+
+    def test_customer_360_view(self):
+        # Go through the public creation endpoint so the Customer record is
+        # actually generated (creation happens in InquiryCreateSerializer,
+        # not as a model-level side effect of Inquiry.objects.create()).
+        create_url = reverse("inquiries:inquiry-list-create")
+        res_create = self.client.post(
+            create_url,
+            {
+                "inquiry_type": InquiryType.GENERAL,
+                "full_name": "Return Traveler",
+                "email": "repeat@example.com",
+                "message": "Looking for a return trip.",
+            },
+            format="json",
+        )
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+        inquiry_number = res_create.json()["data"]["inquiry_number"]
+
+        self.assertTrue(Customer.objects.filter(email="repeat@example.com").exists())
+
+        self.client.force_authenticate(user=self.agent_user)
+        url = reverse("inquiries:crm-customer-detail", kwargs={"email": "repeat@example.com"})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.json()["data"]
+        self.assertEqual(data["email"], "repeat@example.com")
+        self.assertEqual(len(data["inquiries"]), 1)
+        self.assertEqual(data["inquiries"][0]["inquiry_number"], inquiry_number)

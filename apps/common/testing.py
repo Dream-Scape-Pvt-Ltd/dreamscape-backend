@@ -21,7 +21,7 @@ class PortalFixtures:
             difficulty_grade='GRADE_3', starting_price_usd=Decimal('1000'), overview='Everest trekking')
         cls.departure = TripDeparture.objects.create(trip=cls.trip,
             start_date=date.today() + timedelta(days=60), end_date=date.today() + timedelta(days=74),
-            price_usd=1000, max_seats=10, available_seats=10)
+            price_usd=1000, max_seats=10, booked_seats=0)
 
     def setUp(self):
         super().setUp()

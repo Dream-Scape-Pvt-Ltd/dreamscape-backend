@@ -1,13 +1,15 @@
 from datetime import timedelta
 from decimal import Decimal
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.bookings.models import Booking, PassengerDetail, PaymentType, BookingStatus
 from apps.bookings.serializers.passenger_serializers import PassengerDetailSerializer
+from apps.bookings.services import promote_waitlist
 from apps.bookings.utils import generate_booking_reference
 from apps.common.exceptions import SeatsUnavailableError
-from apps.trips.models import TripDeparture, DepartureStatus
+from apps.trips.models import TripDeparture
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
 
 
@@ -77,11 +79,11 @@ class BookingCreateSerializer(serializers.Serializer):
             if departure.available_seats < num_travelers:
                 raise SeatsUnavailableError()
 
-            # Deduct seats atomically
-            departure.available_seats -= num_travelers
-            if departure.available_seats == 0:
-                departure.status = DepartureStatus.SOLD_OUT
-            departure.save(update_fields=["available_seats", "status", "updated_at"])
+            # Consume seats atomically. booked_seats is the only seat counter
+            # written here; available_seats derives from it.
+            departure.booked_seats += num_travelers
+            departure.recompute_status()
+            departure.save(update_fields=["booked_seats", "status", "updated_at"])
 
             # Calculate finances
             unit_price = departure.price_usd
@@ -124,7 +126,43 @@ class BookingCreateSerializer(serializers.Serializer):
             ]
             PassengerDetail.objects.bulk_create(passenger_objects)
 
+            self._link_crm_records(booking)
+
         return booking
+
+    def _link_crm_records(self, booking):
+        """
+        CRM conversion tracking: best-effort links this booking back to the
+        most recent open inquiry from the same email address, and keeps the
+        deduplicated Customer profile's lifetime_bookings counter in sync.
+        Never blocks booking creation if no match is found.
+        """
+        from apps.inquiries.models import Customer, Inquiry, InquiryStatus
+
+        customer = Customer.get_or_create_from_contact(
+            email=booking.customer_email,
+            full_name=booking.customer_name,
+            phone=booking.customer_phone,
+        )
+        customer.lifetime_bookings += 1
+        customer.save(update_fields=["lifetime_bookings", "updated_at"])
+
+        matched_inquiry = (
+            Inquiry.objects.filter(
+                email__iexact=booking.customer_email,
+                converted_booking__isnull=True,
+                status__in=[InquiryStatus.NEW, InquiryStatus.ASSIGNED, InquiryStatus.IN_CONTACT],
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if matched_inquiry:
+            # Only the conversion link is set here; status stays under the
+            # agent's manual control (ASSIGNED/IN_CONTACT -> TRAVELING/COMPLETED
+            # still tracks actual trip progress, not just "a booking exists").
+            matched_inquiry.converted_booking = booking
+            matched_inquiry.converted_at = timezone.now()
+            matched_inquiry.save(update_fields=["converted_booking", "converted_at", "updated_at"])
 
 
 class BookingListSerializer(serializers.ModelSerializer):
@@ -259,18 +297,22 @@ class BookingCancelSerializer(serializers.Serializer):
             if locked_booking.status == BookingStatus.CANCELLED:
                 raise serializers.ValidationError("Booking is already cancelled.")
 
+            departure = None
             if locked_booking.departure_id:
                 departure = TripDeparture.objects.select_for_update().get(id=locked_booking.departure_id)
-                departure.available_seats = min(
-                    departure.available_seats + locked_booking.num_travelers,
-                    departure.max_seats,
+                # Release the seats back to the ledger. max() guards against a
+                # double-cancel driving the counter negative.
+                departure.booked_seats = max(
+                    departure.booked_seats - locked_booking.num_travelers, 0
                 )
-                if departure.status == DepartureStatus.SOLD_OUT and departure.available_seats > 0:
-                    departure.status = DepartureStatus.GUARANTEED if departure.is_guaranteed else DepartureStatus.LIMITED
-                departure.save(update_fields=["available_seats", "status", "updated_at"])
+                departure.recompute_status()
+                departure.save(update_fields=["booked_seats", "status", "updated_at"])
 
             locked_booking.status = BookingStatus.CANCELLED
             locked_booking.cancellation_reason = cancellation_reason
             locked_booking.save(update_fields=["status", "cancellation_reason", "updated_at"])
+
+            if departure is not None:
+                promote_waitlist(departure)
 
         return locked_booking

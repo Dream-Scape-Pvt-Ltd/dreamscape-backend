@@ -1,10 +1,12 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.common.permissions import IsSalesAgentOrAdmin
+from apps.inquiries.filters import InquiryFilter
 from apps.inquiries.models import Inquiry, InquiryNote
 from apps.inquiries.serializers import (
     InquiryCreateSerializer,
@@ -24,8 +26,14 @@ class InquiryListCreateView(generics.ListCreateAPIView):
     GET /api/v1/inquiries/
         CRM Lead pipeline dashboard list.
         Permissions: IsSalesAgentOrAdmin (restricted to SALES_AGENT and ADMIN roles).
-        Filters: ?status=, ?inquiry_type=, ?assigned_agent= (UUID or 'me'), ?search=
+        Filters: see InquiryFilter — ?trip= (slug), ?departure= (uuid), ?status=,
+        ?inquiry_type=, ?assigned_agent= (UUID, 'me' or 'unassigned'),
+        ?lead_source=, ?sla_breached=, ?tag=, ?created_after=/?created_before=,
+        ?departure_after=/?departure_before=, ?search=
     """
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = InquiryFilter
 
     def get_permissions(self):
         if self.request.method == "POST":
@@ -41,41 +49,15 @@ class InquiryListCreateView(generics.ListCreateAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Inquiry.objects.none()
 
-        qs = (
+        # Filtering is handled by InquiryFilter (filterset_class) so that bad
+        # input is rejected with 400 rather than reaching the database.
+        return (
             Inquiry.objects.all()
-            .select_related("assigned_agent", "trip", "departure")
+            .select_related("assigned_agent", "trip", "trip__destination", "departure__trip")
+            .prefetch_related("tags")
             .order_by("-created_at")
+            .distinct()
         )
-
-        params = self.request.query_params
-        # Filter by status
-        status_filter = params.get("status")
-        if status_filter:
-            qs = qs.filter(status=status_filter.upper())
-
-        # Filter by inquiry_type
-        type_filter = params.get("inquiry_type")
-        if type_filter:
-            qs = qs.filter(inquiry_type=type_filter.upper())
-
-        # Filter by assigned_agent
-        agent_filter = params.get("assigned_agent")
-        if agent_filter:
-            if agent_filter.lower() == "me":
-                qs = qs.filter(assigned_agent=self.request.user)
-            else:
-                qs = qs.filter(assigned_agent_id=agent_filter)
-
-        # Search query across full_name, email, inquiry_number
-        search_query = params.get("search")
-        if search_query:
-            qs = qs.filter(
-                Q(full_name__icontains=search_query)
-                | Q(email__icontains=search_query)
-                | Q(inquiry_number__icontains=search_query)
-            )
-
-        return qs
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})

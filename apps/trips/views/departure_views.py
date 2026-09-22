@@ -1,3 +1,4 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound
@@ -5,8 +6,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.common.permissions import IsAdminRole
-from apps.trips.models import DepartureStatus, Trip, TripDeparture
+from apps.trips.filters import DepartureCapacityFilter
+from apps.trips.models import Trip, TripDeparture
 from apps.trips.serializers import (
+    DepartureCapacitySerializer,
     TripDepartureSerializer,
     TripDepartureWriteSerializer,
 )
@@ -41,7 +44,7 @@ class DepartureListCreateView(generics.ListCreateAPIView):
 
         # Optional query param: ?available_only=true
         if self.request.query_params.get("available_only", "").lower() in ["true", "1"]:
-            qs = qs.filter(available_seats__gt=0).exclude(status=DepartureStatus.SOLD_OUT)
+            qs = qs.bookable().order_by("start_date")
 
         return qs
 
@@ -71,6 +74,42 @@ class DepartureListCreateView(generics.ListCreateAPIView):
         departure = serializer.save(trip=trip)
         response = Response(TripDepartureSerializer(departure).data, status=status.HTTP_201_CREATED)
         response.success_message = "Departure scheduled successfully."
+        return response
+
+
+class DepartureCapacityListView(generics.ListAPIView):
+    """
+    GET /api/v1/trips/departures/
+        Cross-trip capacity board: seat ledger plus live demand counters for
+        every departure, filterable by trip, destination, date window, status,
+        and capacity state.
+        Permissions: IsAdminRole.
+    """
+
+    permission_classes = [IsAdminRole]
+    serializer_class = DepartureCapacitySerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = DepartureCapacityFilter
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return TripDeparture.objects.none()
+        return (
+            TripDeparture.objects.with_capacity_counts()
+            .select_related("trip")
+            .order_by("start_date")
+        )
+
+    @extend_schema(
+        tags=["Trips Admin"],
+        responses={
+            200: DepartureCapacitySerializer(many=True),
+            403: OpenApiResponse(description="Forbidden: Admin role required."),
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        response.success_message = "Departure capacity retrieved successfully."
         return response
 
 

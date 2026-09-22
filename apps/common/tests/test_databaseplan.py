@@ -152,7 +152,6 @@ class DatabaseArchitectureTestCase(TestCase):
             end_date=date.today() + timedelta(days=76),
             price_usd=Decimal("1850.00"),
             max_seats=12,
-            available_seats=12,
             status=DepartureStatus.GUARANTEED,
             is_guaranteed=True,
         )
@@ -196,7 +195,7 @@ class DatabaseArchitectureTestCase(TestCase):
             )
 
     def test_trip_departure_seats_constraint(self):
-        # Negative available seats must violate CheckConstraint
+        # Booking more seats than capacity must violate CheckConstraint
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 TripDeparture.objects.create(
@@ -205,8 +204,35 @@ class DatabaseArchitectureTestCase(TestCase):
                     end_date=date.today() + timedelta(days=20),
                     price_usd=Decimal("1000.00"),
                     max_seats=10,
-                    available_seats=-1,  # Invalid!
+                    booked_seats=11,  # Invalid!
                 )
+
+    def test_trip_departure_reserved_seats_constraint(self):
+        # Reserved seats must leave room for the seats already booked
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                TripDeparture.objects.create(
+                    trip=self.trip,
+                    start_date=date.today() + timedelta(days=10),
+                    end_date=date.today() + timedelta(days=20),
+                    price_usd=Decimal("1000.00"),
+                    max_seats=10,
+                    booked_seats=6,
+                    reserved_seats=5,  # 6 + 5 > 10, invalid!
+                )
+
+    def test_available_seats_derives_from_ledger(self):
+        departure = TripDeparture.objects.create(
+            trip=self.trip,
+            start_date=date.today() + timedelta(days=90),
+            end_date=date.today() + timedelta(days=100),
+            price_usd=Decimal("1000.00"),
+            max_seats=10,
+            booked_seats=3,
+            reserved_seats=2,
+        )
+        self.assertEqual(departure.available_seats, 5)
+        self.assertEqual(departure.utilization_pct, 50)
 
     def test_trip_departure_dates_constraint(self):
         # end_date before start_date must violate CheckConstraint
@@ -218,7 +244,6 @@ class DatabaseArchitectureTestCase(TestCase):
                     end_date=date.today() + timedelta(days=20),  # Invalid!
                     price_usd=Decimal("1000.00"),
                     max_seats=10,
-                    available_seats=10,
                 )
 
     def test_review_rating_constraint_and_verified_signal(self):

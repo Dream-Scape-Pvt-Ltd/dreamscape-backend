@@ -7,6 +7,11 @@ from .passenger_views import (
     PassengerListView,
     PassengerDetailView,
 )
+from .waitlist_views import (
+    WaitlistJoinView,
+    DepartureWaitlistView,
+    WaitlistPromoteView,
+)
 
 __all__ = [
     "BookingListCreateView",
@@ -14,4 +19,7 @@ __all__ = [
     "BookingCancelView",
     "PassengerListView",
     "PassengerDetailView",
+    "WaitlistJoinView",
+    "DepartureWaitlistView",
+    "WaitlistPromoteView",
 ]

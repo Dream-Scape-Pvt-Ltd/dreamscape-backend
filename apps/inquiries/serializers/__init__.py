@@ -9,6 +9,10 @@ from .tailor_made_serializers import (
     TailorMadeRequestSerializer,
     TailorMadeRequestCreateSerializer,
 )
+from .activity_serializers import ActivitySerializer, ActivityCreateSerializer
+from .task_serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer
+from .tag_serializers import TagSerializer
+from .customer_serializers import CustomerSerializer
 
 __all__ = [
     "InquiryCreateSerializer",
@@ -18,4 +22,11 @@ __all__ = [
     "InquiryUpdateSerializer",
     "TailorMadeRequestSerializer",
     "TailorMadeRequestCreateSerializer",
+    "ActivitySerializer",
+    "ActivityCreateSerializer",
+    "TaskSerializer",
+    "TaskCreateSerializer",
+    "TaskUpdateSerializer",
+    "TagSerializer",
+    "CustomerSerializer",
 ]

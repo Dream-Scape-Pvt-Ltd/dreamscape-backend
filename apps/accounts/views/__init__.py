@@ -8,6 +8,7 @@ from .auth_views import (
     TokenRefreshView,
 )
 from .user_views import (
+    AgentListView,
     UserDetailView,
     UserListView,
     UserProfileView,
@@ -24,4 +25,5 @@ __all__ = [
     "UserProfileView",
     "UserListView",
     "UserDetailView",
+    "AgentListView",
 ]

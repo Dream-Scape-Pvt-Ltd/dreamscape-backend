@@ -1,4 +1,5 @@
 from .departure_views import (
+    DepartureCapacityListView,
     DepartureDetailView,
     DepartureListCreateView,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "ItineraryDayDetailView",
     "DepartureListCreateView",
     "DepartureDetailView",
+    "DepartureCapacityListView",
     "ReviewListCreateView",
     "ReviewModerationView",
     "ExpeditionDetailView",

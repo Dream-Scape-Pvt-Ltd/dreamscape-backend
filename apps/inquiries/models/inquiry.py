@@ -20,6 +20,15 @@ class InquiryStatus(models.TextChoices):
     CLOSED = "CLOSED", "Closed / Not Converted"
 
 
+class LostReason(models.TextChoices):
+    PRICE = "PRICE", "Price Too High"
+    DATES = "DATES", "Dates Didn't Work"
+    COMPETITOR = "COMPETITOR", "Booked With Competitor"
+    NO_RESPONSE = "NO_RESPONSE", "Went Unresponsive"
+    NOT_SUITABLE = "NOT_SUITABLE", "Trip Not Suitable"
+    OTHER = "OTHER", "Other"
+
+
 class Inquiry(TimeStampedModel):
     """
     Inbound CRM lead, trip inquiry, or tailor-made custom adventure request.
@@ -29,6 +38,13 @@ class Inquiry(TimeStampedModel):
         max_length=30,
         unique=True,
         db_index=True,
+    )
+    customer = models.ForeignKey(
+        "inquiries.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inquiries",
     )
     inquiry_type = models.CharField(
         max_length=30,
@@ -76,6 +92,18 @@ class Inquiry(TimeStampedModel):
         blank=True,
         related_name="assigned_inquiries",
     )
+    converted_booking = models.OneToOneField(
+        "bookings.Booking",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_inquiry",
+    )
+    converted_at = models.DateTimeField(null=True, blank=True)
+    lost_reason = models.CharField(max_length=20, choices=LostReason.choices, blank=True)
+    first_response_at = models.DateTimeField(null=True, blank=True)
+    sla_breached = models.BooleanField(default=False, db_index=True)
+    tags = models.ManyToManyField("inquiries.Tag", blank=True, related_name="inquiries")
 
     class Meta:
         db_table = "inquiries"

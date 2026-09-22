@@ -104,6 +104,12 @@ class Booking(TimeStampedModel):
                 condition=Q(num_travelers__gte=1),
                 name="minimum_one_traveler",
             ),
+            # Every booking is anchored to something schedulable: a published
+            # departure, or a tailor-made trip with no fixed departure.
+            models.CheckConstraint(
+                condition=Q(departure__isnull=False) | Q(custom_trip__isnull=False),
+                name="booking_requires_departure_or_custom_trip",
+            ),
         ]
         indexes = [
             models.Index(fields=["customer_email", "status"], name="book_email_status_idx"),

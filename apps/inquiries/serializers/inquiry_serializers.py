@@ -3,7 +3,17 @@ from django.db import transaction
 from rest_framework import serializers
 
 from apps.accounts.serializers.user_serializers import UserMinimalSerializer
-from apps.inquiries.models import Inquiry, InquiryNote, InquiryType, InquiryStatus, TailorMadeRequest
+from apps.inquiries.models import (
+    Customer,
+    Inquiry,
+    InquiryNote,
+    InquiryType,
+    InquiryStatus,
+    LostReason,
+    TailorMadeRequest,
+)
+from apps.inquiries.serializers.activity_serializers import ActivitySerializer
+from apps.inquiries.serializers.tag_serializers import TagSerializer
 from apps.inquiries.serializers.tailor_made_serializers import TailorMadeRequestSerializer
 from apps.inquiries.tasks import send_inquiry_acknowledgement_email, send_agent_whatsapp_alert
 from apps.inquiries.utils import generate_inquiry_number
@@ -11,6 +21,21 @@ from apps.trips.models import Trip, TripDeparture
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
 
 User = get_user_model()
+
+
+def assignable_agents():
+    """
+    Staff who may own a CRM lead.
+
+    A lazily-evaluated queryset, so it is safe to bind at class-definition time
+    in a serializer field.
+    """
+    from apps.accounts.models import UserRole
+
+    return User.objects.filter(
+        role__in=[UserRole.ADMIN, UserRole.SALES_AGENT],
+        is_active=True,
+    )
 
 
 class InquiryNoteSerializer(serializers.ModelSerializer):
@@ -83,15 +108,27 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
             while Inquiry.objects.filter(inquiry_number=inq_num).exists():
                 inq_num = generate_inquiry_number()
 
+            customer = Customer.get_or_create_from_contact(
+                email=validated_data["email"],
+                full_name=validated_data.get("full_name", ""),
+                phone=validated_data.get("phone", ""),
+                whatsapp_number=validated_data.get("whatsapp_number", ""),
+            )
+            customer.lifetime_inquiries = customer.inquiries.count() + 1
+            customer.save(update_fields=["lifetime_inquiries", "updated_at"])
+
             inquiry = Inquiry.objects.create(
                 inquiry_number=inq_num,
                 status=InquiryStatus.NEW,
+                customer=customer,
                 **validated_data,
             )
 
             if tailor_made_data or validated_data.get("inquiry_type") == InquiryType.TAILOR_MADE:
                 tm_data = tailor_made_data or {}
                 TailorMadeRequest.objects.create(inquiry=inquiry, **tm_data)
+
+            self._apply_assignment_rules(inquiry)
 
         # Trigger async tasks
         try:
@@ -102,6 +139,36 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
 
         return inquiry
 
+    def _apply_assignment_rules(self, inquiry):
+        """
+        Route the new lead to a specialist agent, if a rule covers what it is
+        asking about. Runs inside the caller's atomic block.
+
+        No matching rule leaves the lead unassigned, exactly as before rules
+        existed — routing is additive, never a gate on lead capture.
+        """
+        from apps.inquiries.models import Activity, ActivityChannel, resolve_agent
+
+        agent = resolve_agent(inquiry)
+        if not agent:
+            return
+
+        inquiry.assigned_agent = agent
+        inquiry.status = InquiryStatus.ASSIGNED
+        inquiry.save(update_fields=["assigned_agent", "status", "updated_at"])
+
+        Activity.objects.create(
+            inquiry=inquiry,
+            author=None,
+            channel=ActivityChannel.SYSTEM,
+            body=f"Auto-assigned to {agent.get_full_name() or agent.email} by tour assignment rule.",
+            metadata={
+                "from_agent": None,
+                "to_agent": str(agent.id),
+                "reason": "assignment_rule",
+            },
+        )
+
 
 class InquiryListSerializer(serializers.ModelSerializer):
     """
@@ -109,7 +176,11 @@ class InquiryListSerializer(serializers.ModelSerializer):
     """
 
     assigned_agent_name = serializers.SerializerMethodField()
+    assigned_agent_id = serializers.UUIDField(source="assigned_agent.id", read_only=True, default=None)
     trip_title = serializers.CharField(source="trip.title", read_only=True)
+    trip_slug = serializers.CharField(source="trip.slug", read_only=True)
+    departure_label = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Inquiry
@@ -123,7 +194,13 @@ class InquiryListSerializer(serializers.ModelSerializer):
             "whatsapp_number",
             "status",
             "trip_title",
+            "trip_slug",
+            "departure",
+            "departure_label",
             "assigned_agent_name",
+            "assigned_agent_id",
+            "tags",
+            "sla_breached",
             "created_at",
         ]
 
@@ -131,6 +208,12 @@ class InquiryListSerializer(serializers.ModelSerializer):
         if obj.assigned_agent:
             return obj.assigned_agent.get_full_name() or obj.assigned_agent.email
         return None
+
+    def get_departure_label(self, obj) -> str | None:
+        """Human-readable batch identity for the CRM's tour column."""
+        if not obj.departure_id:
+            return None
+        return f"{obj.departure.start_date:%d %b %Y} – {obj.departure.end_date:%d %b %Y}"
 
 
 class InquiryDetailSerializer(serializers.ModelSerializer):
@@ -144,10 +227,13 @@ class InquiryDetailSerializer(serializers.ModelSerializer):
 
     assigned_agent = UserMinimalSerializer(read_only=True)
     notes = InquiryNoteSerializer(many=True, read_only=True)
+    activities = ActivitySerializer(many=True, read_only=True)
     tailor_made_detail = TailorMadeRequestSerializer(read_only=True)
     departure = TripDepartureSerializer(read_only=True)
     trip_title = serializers.CharField(source="trip.title", read_only=True)
     trip_slug = serializers.CharField(source="trip.slug", read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+    converted_booking_reference = serializers.CharField(source="converted_booking.booking_reference", read_only=True, default=None)
 
     class Meta:
         model = Inquiry
@@ -169,9 +255,16 @@ class InquiryDetailSerializer(serializers.ModelSerializer):
             "group_size",
             "lead_source",
             "status",
+            "lost_reason",
             "assigned_agent",
             "tailor_made_detail",
             "notes",
+            "activities",
+            "tags",
+            "first_response_at",
+            "sla_breached",
+            "converted_booking_reference",
+            "converted_at",
             "created_at",
             "updated_at",
         ]
@@ -183,8 +276,10 @@ class InquiryUpdateSerializer(serializers.ModelSerializer):
     Agent write serializer for CRM pipeline state transitions and agent assignment.
     """
 
+    # Scoped to staff who can actually work a lead. An unscoped queryset let
+    # any user id through, including customers and B2B partners.
     assigned_agent_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
+        queryset=assignable_agents(),
         source="assigned_agent",
         required=False,
         allow_null=True,
@@ -195,4 +290,52 @@ class InquiryUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "status",
             "assigned_agent_id",
+            "lost_reason",
         ]
+
+    def validate(self, attrs):
+        new_status = attrs.get("status", self.instance.status if self.instance else None)
+        if new_status == InquiryStatus.CLOSED:
+            lost_reason = attrs.get("lost_reason") or (self.instance.lost_reason if self.instance else "")
+            already_converted = self.instance and self.instance.converted_booking_id
+            if not lost_reason and not already_converted:
+                raise serializers.ValidationError({
+                    "lost_reason": "A lost reason is required when closing an inquiry that did not convert to a booking."
+                })
+        return attrs
+
+    def update(self, instance, validated_data):
+        from apps.inquiries.models import Activity, ActivityChannel
+
+        request = self.context.get("request")
+        author = request.user if request and request.user.is_authenticated else None
+
+        old_status = instance.status
+        old_agent = instance.assigned_agent
+
+        updated = super().update(instance, validated_data)
+
+        new_status = validated_data.get("status", old_status)
+        if new_status != old_status:
+            Activity.objects.create(
+                inquiry=updated,
+                author=author,
+                channel=ActivityChannel.STATUS_CHANGE,
+                body=f"Status changed from {old_status} to {new_status}.",
+                metadata={"from_status": old_status, "to_status": new_status},
+            )
+
+        new_agent = validated_data.get("assigned_agent", old_agent)
+        if "assigned_agent" in validated_data and new_agent != old_agent:
+            Activity.objects.create(
+                inquiry=updated,
+                author=author,
+                channel=ActivityChannel.SYSTEM,
+                body=f"Reassigned to {new_agent.get_full_name() if new_agent else 'unassigned'}.",
+                metadata={
+                    "from_agent": str(old_agent.id) if old_agent else None,
+                    "to_agent": str(new_agent.id) if new_agent else None,
+                },
+            )
+
+        return updated
