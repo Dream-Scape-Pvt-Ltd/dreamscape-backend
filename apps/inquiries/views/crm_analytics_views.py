@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from django.db.models import Avg, Count, F
+from decimal import Decimal
+
+from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.common.permissions import IsSalesAgentOrAdmin
 from apps.inquiries.models import Inquiry, InquiryStatus, InquiryType, LostReason
+from apps.trips.models import Trip
 
 
 class PipelineSummaryView(APIView):
@@ -124,6 +127,57 @@ class FunnelView(APIView):
                 "avg_days_to_close": avg_days_to_close,
                 "date_from": date_from,
                 "date_to": date_to,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class TrekPipelineView(APIView):
+    """
+    GET /api/v1/inquiries/crm/treks/
+        The CRM organised by active trek: for each active trek, its lead count
+        in every pipeline status, the people who have completed it, and the
+        revenue those completed trips earned (departure price x travellers).
+        Permissions: IsSalesAgentOrAdmin.
+    """
+
+    permission_classes = [IsSalesAgentOrAdmin]
+
+    def get(self, request, *args, **kwargs):
+        status_counts = {
+            f"count_{value}": Count("inquiries", filter=Q(inquiries__status=value))
+            for value, _ in InquiryStatus.choices
+        }
+        completed = Q(inquiries__status=InquiryStatus.COMPLETED)
+        treks = (
+            Trip.objects.filter(is_active=True)
+            .select_related("destination")
+            .annotate(
+                **status_counts,
+                travelers_completed=Sum("inquiries__travelers_count", filter=completed),
+                revenue_usd=Sum("inquiries__revenue_usd", filter=completed),
+            )
+            .order_by("title")
+        )
+
+        results = []
+        for trek in treks:
+            by_status = {value: getattr(trek, f"count_{value}") for value, _ in InquiryStatus.choices}
+            results.append({
+                "id": str(trek.id),
+                "slug": trek.slug,
+                "title": trek.title,
+                "destination_name": trek.destination.name if trek.destination_id else None,
+                "by_status": by_status,
+                "total_leads": sum(by_status.values()),
+                "travelers_completed": trek.travelers_completed or 0,
+                "revenue_usd": str(trek.revenue_usd or Decimal("0.00")),
+            })
+
+        return Response(
+            {
+                "results": results,
+                "total_revenue_usd": str(sum((Decimal(row["revenue_usd"]) for row in results), Decimal("0.00"))),
             },
             status=status.HTTP_200_OK,
         )

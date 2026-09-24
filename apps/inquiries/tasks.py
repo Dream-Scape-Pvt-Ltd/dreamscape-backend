@@ -143,3 +143,17 @@ def nightly_customer_rollup():
 
     logger.info(f"CRM nightly rollup: reconciled {updated} customer record(s)")
     return updated
+
+
+@shared_task
+def advance_travel_statuses():
+    """
+    Celery Beat job (hourly): moves booked leads to TRAVELING when their
+    departure starts and to COMPLETED once its end date has passed, recording
+    each completed trip's revenue.
+    """
+    from apps.inquiries.services import advance_travel_statuses as advance
+
+    started, completed = advance()
+    logger.info(f"CRM travel sweep: {started} lead(s) now traveling, {completed} completed")
+    return started + completed

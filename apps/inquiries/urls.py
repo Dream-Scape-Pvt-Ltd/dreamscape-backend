@@ -17,6 +17,7 @@ from apps.inquiries.views import (
     TagListCreateView,
     TaskDetailUpdateView,
     TaskListCreateView,
+    TrekPipelineView,
 )
 
 app_name = "inquiries"
@@ -28,6 +29,7 @@ urlpatterns = [
     path("tasks/<uuid:pk>/", TaskDetailUpdateView.as_view(), name="task-detail"),
     path("crm/pipeline-summary/", PipelineSummaryView.as_view(), name="crm-pipeline-summary"),
     path("crm/funnel/", FunnelView.as_view(), name="crm-funnel"),
+    path("crm/treks/", TrekPipelineView.as_view(), name="crm-trek-pipeline"),
     path("crm/customers/<str:email>/", CustomerDetailView.as_view(), name="crm-customer-detail"),
     path("crm/by-departure/", LeadsByDepartureView.as_view(), name="crm-leads-by-departure"),
     path("crm/assignment-rules/", LeadAssignmentRuleListCreateView.as_view(), name="crm-assignment-rules"),

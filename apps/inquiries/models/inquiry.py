@@ -15,9 +15,19 @@ class InquiryStatus(models.TextChoices):
     NEW = "NEW", "New Lead"
     ASSIGNED = "ASSIGNED", "Assigned to Agent"
     IN_CONTACT = "IN_CONTACT", "In Active Communication"
+    BOOKED = "BOOKED", "Booked on a Departure"
     TRAVELING = "TRAVELING", "Currently Traveling"
     COMPLETED = "COMPLETED", "Completed Trip"
     CLOSED = "CLOSED", "Closed / Not Converted"
+
+
+#: Statuses in which the lead's travellers occupy seats on its departure.
+#: Entering this set from outside takes seats; leaving it gives them back.
+SEAT_HOLDING_STATUSES = (
+    InquiryStatus.BOOKED,
+    InquiryStatus.TRAVELING,
+    InquiryStatus.COMPLETED,
+)
 
 
 class LostReason(models.TextChoices):
@@ -101,6 +111,25 @@ class Inquiry(TimeStampedModel):
     )
     converted_at = models.DateTimeField(null=True, blank=True)
     lost_reason = models.CharField(max_length=20, choices=LostReason.choices, blank=True)
+    travelers_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="People travelling on this lead's departure, fixed when it is booked.",
+    )
+    seats_held = models.PositiveIntegerField(
+        default=0,
+        help_text=(
+            "Seats this lead added to departure.booked_seats. Zero when a real "
+            "Booking already holds them, so they are never counted twice."
+        ),
+    )
+    revenue_usd = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Departure price x travelers, recorded when the trip completes.",
+    )
     first_response_at = models.DateTimeField(null=True, blank=True)
     sla_breached = models.BooleanField(default=False, db_index=True)
     tags = models.ManyToManyField("inquiries.Tag", blank=True, related_name="inquiries")

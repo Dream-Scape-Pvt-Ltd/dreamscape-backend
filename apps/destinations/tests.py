@@ -52,9 +52,9 @@ class DestinationTests(APITestCase):
         res = response.json()
         self.assertTrue(res["success"])
         self.assertGreaterEqual(len(res["data"]["results"]), 1)
-        first = res["data"]["results"][0]
-        self.assertEqual(first["slug"], "everest-region")
-        self.assertIn("trips_count", first)
+        # The seed migration adds the standard regions, so find this test's row.
+        everest = next(row for row in res["data"]["results"] if row["slug"] == "everest-region")
+        self.assertIn("trips_count", everest)
 
     def test_create_destination_as_admin(self):
         self.client.force_authenticate(user=self.admin)

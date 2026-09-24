@@ -201,6 +201,9 @@ class InquiryListSerializer(serializers.ModelSerializer):
             "assigned_agent_id",
             "tags",
             "sla_breached",
+            "group_size",
+            "travelers_count",
+            "revenue_usd",
             "created_at",
         ]
 
@@ -263,6 +266,9 @@ class InquiryDetailSerializer(serializers.ModelSerializer):
             "tags",
             "first_response_at",
             "sla_breached",
+            "travelers_count",
+            "seats_held",
+            "revenue_usd",
             "converted_booking_reference",
             "converted_at",
             "created_at",
@@ -274,6 +280,11 @@ class InquiryDetailSerializer(serializers.ModelSerializer):
 class InquiryUpdateSerializer(serializers.ModelSerializer):
     """
     Agent write serializer for CRM pipeline state transitions and agent assignment.
+
+    Moving a lead into BOOKED puts its travellers on a departure (the lead's
+    own, or ``departure_id``), taking ``travelers_count`` seats — the group size
+    by default. Status changes go through ``transition_status`` so the seat
+    ledger and trip revenue stay in step.
     """
 
     # Scoped to staff who can actually work a lead. An unscoped queryset let
@@ -284,6 +295,12 @@ class InquiryUpdateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    departure_id = serializers.PrimaryKeyRelatedField(
+        queryset=TripDeparture.objects.all(),
+        required=False,
+        write_only=True,
+    )
+    travelers_count = serializers.IntegerField(required=False, min_value=1, write_only=True)
 
     class Meta:
         model = Inquiry
@@ -291,6 +308,8 @@ class InquiryUpdateSerializer(serializers.ModelSerializer):
             "status",
             "assigned_agent_id",
             "lost_reason",
+            "departure_id",
+            "travelers_count",
         ]
 
     def validate(self, attrs):
@@ -306,36 +325,37 @@ class InquiryUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         from apps.inquiries.models import Activity, ActivityChannel
+        from apps.inquiries.services import transition_status
 
         request = self.context.get("request")
         author = request.user if request and request.user.is_authenticated else None
 
-        old_status = instance.status
+        new_status = validated_data.pop("status", instance.status)
+        departure = validated_data.pop("departure_id", None)
+        travelers = validated_data.pop("travelers_count", None)
         old_agent = instance.assigned_agent
 
-        updated = super().update(instance, validated_data)
-
-        new_status = validated_data.get("status", old_status)
-        if new_status != old_status:
-            Activity.objects.create(
-                inquiry=updated,
+        with transaction.atomic():
+            updated = super().update(instance, validated_data)
+            updated = transition_status(
+                updated,
+                new_status,
                 author=author,
-                channel=ActivityChannel.STATUS_CHANGE,
-                body=f"Status changed from {old_status} to {new_status}.",
-                metadata={"from_status": old_status, "to_status": new_status},
+                departure=departure,
+                travelers=travelers,
             )
 
-        new_agent = validated_data.get("assigned_agent", old_agent)
-        if "assigned_agent" in validated_data and new_agent != old_agent:
-            Activity.objects.create(
-                inquiry=updated,
-                author=author,
-                channel=ActivityChannel.SYSTEM,
-                body=f"Reassigned to {new_agent.get_full_name() if new_agent else 'unassigned'}.",
-                metadata={
-                    "from_agent": str(old_agent.id) if old_agent else None,
-                    "to_agent": str(new_agent.id) if new_agent else None,
-                },
-            )
+            new_agent = validated_data.get("assigned_agent", old_agent)
+            if "assigned_agent" in validated_data and new_agent != old_agent:
+                Activity.objects.create(
+                    inquiry=updated,
+                    author=author,
+                    channel=ActivityChannel.SYSTEM,
+                    body=f"Reassigned to {new_agent.get_full_name() if new_agent else 'unassigned'}.",
+                    metadata={
+                        "from_agent": str(old_agent.id) if old_agent else None,
+                        "to_agent": str(new_agent.id) if new_agent else None,
+                    },
+                )
 
         return updated

@@ -41,10 +41,10 @@ class BookingAPITests(APITestCase):
         )
 
         # Create destination, category, trip, and departure
-        self.destination = Destination.objects.create(
-            name="Nepal",
+        # "nepal" is seeded by a destinations migration, so reuse it.
+        self.destination, _ = Destination.objects.get_or_create(
             slug="nepal",
-            country=DestinationCountry.NEPAL,
+            defaults={"name": "Nepal", "country": DestinationCountry.NEPAL},
         )
         self.category = ActivityCategory.objects.create(
             name="Classic Treks",

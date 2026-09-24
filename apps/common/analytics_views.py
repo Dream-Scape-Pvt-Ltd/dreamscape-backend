@@ -164,6 +164,7 @@ class DashboardAnalyticsView(APIView):
             "NEW": Inquiry.objects.filter(status="NEW").count(),
             "ASSIGNED": Inquiry.objects.filter(status="ASSIGNED").count(),
             "IN_CONTACT": Inquiry.objects.filter(status="IN_CONTACT").count(),
+            "BOOKED": Inquiry.objects.filter(status="BOOKED").count(),
             "TRAVELING": Inquiry.objects.filter(status="TRAVELING").count(),
             "COMPLETED": Inquiry.objects.filter(status="COMPLETED").count(),
             "CLOSED": Inquiry.objects.filter(status="CLOSED").count(),

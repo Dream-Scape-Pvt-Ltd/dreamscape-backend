@@ -276,6 +276,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.inquiries.tasks.send_task_reminders',
         'schedule': 900.0,  # every 15 minutes
     },
+    'crm-advance-travel-statuses': {
+        'task': 'apps.inquiries.tasks.advance_travel_statuses',
+        'schedule': 3600.0,  # hourly
+    },
     'crm-nightly-customer-rollup': {
         'task': 'apps.inquiries.tasks.nightly_customer_rollup',
         'schedule': 86400.0,  # daily
