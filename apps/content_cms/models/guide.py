@@ -44,6 +44,9 @@ class TravelGuide(TimeStampedModel):
     markdown_content = models.TextField()
     hero_image_url = models.URLField(max_length=500, blank=True)
     gallery_images = models.JSONField(default=list, blank=True)
+    # Article body as ordered sections: [{heading, body, image_url, image_caption}].
+    # markdown_content mirrors them for search, excerpts and older readers.
+    sections = models.JSONField(default=list, blank=True)
     meta_title = models.CharField(max_length=255, blank=True)
     meta_description = models.CharField(max_length=500, blank=True)
     canonical_url = models.URLField(max_length=500, blank=True)

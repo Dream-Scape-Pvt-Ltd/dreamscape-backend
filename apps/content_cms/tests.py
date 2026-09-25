@@ -65,6 +65,59 @@ class ContentAPITests(PortalFixtures, APITestCase):
         response = self.client.patch(path, {'is_published': True, 'published_at': '2000-01-01T00:00:00Z'})
         self.assertEqual(response.data['published_at'], published)
 
+    def test_admin_writes_a_sectioned_article(self):
+        self.client.force_authenticate(self.admin)
+        payload = {'title': 'Namche days', 'country': 'NEPAL', 'category': 'ADVENTURE', 'sections': [
+            {'heading': 'Arrival', 'body': 'We walked in.\n\n- Tea\n- Rest', 'image_url': 'https://example.com/a.jpg',
+             'image_caption': 'The bazaar', 'extra': 'dropped'},
+            {'heading': '', 'body': '', 'image_url': '', 'image_caption': ''},
+            {'heading': 'Acclimatisation', 'body': 'A slow day.', 'image_url': '/media/b.jpg'},
+        ]}
+        response = self.client.post('/api/v1/content/guides/', payload, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        guide = TravelGuide.objects.get(slug='namche-days')
+        # The empty card is dropped, unknown keys are stripped, and the Markdown mirror is rebuilt.
+        self.assertEqual(guide.sections, [
+            {'heading': 'Arrival', 'body': 'We walked in.\n\n- Tea\n- Rest', 'image_url': 'https://example.com/a.jpg',
+             'image_caption': 'The bazaar'},
+            {'heading': 'Acclimatisation', 'body': 'A slow day.', 'image_url': '/media/b.jpg', 'image_caption': ''},
+        ])
+        self.assertEqual(guide.markdown_content,
+                         '## Arrival\n\nWe walked in.\n\n- Tea\n- Rest\n\n## Acclimatisation\n\nA slow day.')
+        detail = self.client.get('/api/v1/content/guides/namche-days/').data
+        self.assertEqual(len(detail['sections']), 2)
+        self.assertIn('https://example.com/a.jpg', detail['schema_org_article']['image'])
+
+        response = self.client.patch('/api/v1/content/guides/namche-days/',
+                                     {'sections': [{'heading': 'Only', 'body': 'One now.'}]}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        guide.refresh_from_db()
+        self.assertEqual(guide.markdown_content, '## Only\n\nOne now.')
+
+    def test_article_sections_are_validated(self):
+        self.client.force_authenticate(self.admin)
+        base = {'title': 'Bad', 'country': 'NEPAL', 'category': 'ADVENTURE'}
+        for sections in (
+            [{'heading': 'x', 'image_url': 'javascript:alert(1)'}],
+            [{'heading': 'x' * 201}],
+            ['not a section'],
+            [{'heading': str(i)} for i in range(31)],
+            [],
+        ):
+            response = self.client.post('/api/v1/content/guides/', {**base, 'sections': sections}, format='json')
+            self.assertEqual(response.status_code, 400, sections)
+
+    def test_admin_can_permanently_delete_a_post_and_its_comments(self):
+        guide = TravelGuide.objects.create(title='Gone soon', slug='gone-soon', country='NEPAL',
+            category='OTHER', markdown_content='x', is_published=True)
+        BlogComment.objects.create(guide=guide, author_name='Reader', body='Nice')
+        self.client.force_authenticate(self.customer)
+        self.assertEqual(self.client.delete('/api/v1/content/guides/gone-soon/?permanent=true').status_code, 403)
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.delete('/api/v1/content/guides/gone-soon/?permanent=true').status_code, 204)
+        self.assertFalse(TravelGuide.objects.filter(slug='gone-soon').exists())
+        self.assertFalse(BlogComment.objects.filter(body='Nice').exists())
+
     def test_customer_cannot_edit_or_delete(self):
         self.client.force_authenticate(self.customer)
         path = '/api/v1/content/guides/everest-permits/'

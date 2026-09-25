@@ -128,8 +128,6 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
                 tm_data = tailor_made_data or {}
                 TailorMadeRequest.objects.create(inquiry=inquiry, **tm_data)
 
-            self._apply_assignment_rules(inquiry)
-
         # Trigger async tasks
         try:
             send_inquiry_acknowledgement_email(inquiry.id)
@@ -138,36 +136,6 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
             pass
 
         return inquiry
-
-    def _apply_assignment_rules(self, inquiry):
-        """
-        Route the new lead to a specialist agent, if a rule covers what it is
-        asking about. Runs inside the caller's atomic block.
-
-        No matching rule leaves the lead unassigned, exactly as before rules
-        existed — routing is additive, never a gate on lead capture.
-        """
-        from apps.inquiries.models import Activity, ActivityChannel, resolve_agent
-
-        agent = resolve_agent(inquiry)
-        if not agent:
-            return
-
-        inquiry.assigned_agent = agent
-        inquiry.status = InquiryStatus.ASSIGNED
-        inquiry.save(update_fields=["assigned_agent", "status", "updated_at"])
-
-        Activity.objects.create(
-            inquiry=inquiry,
-            author=None,
-            channel=ActivityChannel.SYSTEM,
-            body=f"Auto-assigned to {agent.get_full_name() or agent.email} by tour assignment rule.",
-            metadata={
-                "from_agent": None,
-                "to_agent": str(agent.id),
-                "reason": "assignment_rule",
-            },
-        )
 
 
 class InquiryListSerializer(serializers.ModelSerializer):

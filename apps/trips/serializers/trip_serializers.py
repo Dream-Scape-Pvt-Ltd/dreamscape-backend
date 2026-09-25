@@ -55,6 +55,7 @@ class TripListSerializer(serializers.ModelSerializer):
             "starting_price_usd",
             "altitude_max_meters",
             "difficulty_grade",
+            "max_group_size",
             "hero_image_url",
             "gallery_images",
             "is_featured",

@@ -158,7 +158,8 @@ class InquiryFilterTests(CRMTestBase):
 
 
 class AssignmentRuleTests(CRMTestBase):
-    def test_departure_rule_assigns_new_lead(self):
+    def test_new_leads_stay_new_and_unassigned_even_when_a_rule_matches(self):
+        # Agent routing was retired from the CRM: rules no longer act on intake.
         LeadAssignmentRule.objects.create(
             departure=self.march_departure, agent=self.annapurna_agent
         )
@@ -166,51 +167,9 @@ class AssignmentRuleTests(CRMTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         inquiry = Inquiry.objects.get(email="prospect@example.com")
-        self.assertEqual(inquiry.assigned_agent, self.annapurna_agent)
-        self.assertEqual(inquiry.status, InquiryStatus.ASSIGNED)
-
-        activity = Activity.objects.get(inquiry=inquiry, channel=ActivityChannel.SYSTEM)
-        self.assertEqual(activity.metadata["reason"], "assignment_rule")
-        self.assertEqual(activity.metadata["to_agent"], str(self.annapurna_agent.id))
-
-    def test_departure_rule_beats_trip_rule(self):
-        LeadAssignmentRule.objects.create(trip=self.trip, agent=self.other_agent)
-        LeadAssignmentRule.objects.create(
-            departure=self.march_departure, agent=self.annapurna_agent
-        )
-        self.submit_inquiry()
-        inquiry = Inquiry.objects.get(email="prospect@example.com")
-        self.assertEqual(inquiry.assigned_agent, self.annapurna_agent)
-
-    def test_trip_rule_applies_when_no_departure_rule(self):
-        LeadAssignmentRule.objects.create(trip=self.trip, agent=self.annapurna_agent)
-        self.submit_inquiry()
-        inquiry = Inquiry.objects.get(email="prospect@example.com")
-        self.assertEqual(inquiry.assigned_agent, self.annapurna_agent)
-
-    def test_destination_rule_is_the_broadest_fallback(self):
-        LeadAssignmentRule.objects.create(
-            destination=self.destination, agent=self.annapurna_agent
-        )
-        self.submit_inquiry(trip=str(self.other_trip.id), departure=None)
-        inquiry = Inquiry.objects.get(email="prospect@example.com")
-        self.assertEqual(inquiry.assigned_agent, self.annapurna_agent)
-
-    def test_no_matching_rule_leaves_lead_unassigned(self):
-        self.submit_inquiry()
-        inquiry = Inquiry.objects.get(email="prospect@example.com")
         self.assertIsNone(inquiry.assigned_agent)
         self.assertEqual(inquiry.status, InquiryStatus.NEW)
-
-    def test_inactive_rule_is_ignored(self):
-        LeadAssignmentRule.objects.create(
-            departure=self.march_departure,
-            agent=self.annapurna_agent,
-            is_active=False,
-        )
-        self.submit_inquiry()
-        inquiry = Inquiry.objects.get(email="prospect@example.com")
-        self.assertIsNone(inquiry.assigned_agent)
+        self.assertFalse(Activity.objects.filter(inquiry=inquiry, channel=ActivityChannel.SYSTEM).exists())
 
     def test_rule_crud_requires_admin(self):
         url = reverse("inquiries:crm-assignment-rules")

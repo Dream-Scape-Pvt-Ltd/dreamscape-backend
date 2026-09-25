@@ -103,6 +103,7 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
             "region",
             "category",
             "markdown_content",
+            "sections",
             "hero_image_url",
             "gallery_images",
             "meta_title",
@@ -133,7 +134,9 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
             "@type": "Article",
             "headline": obj.title,
             "description": obj.meta_description or obj.markdown_content[:200],
-            "image": ([obj.hero_image_url] if obj.hero_image_url else []) + list(obj.gallery_images or []),
+            "image": ([obj.hero_image_url] if obj.hero_image_url else [])
+            + [s["image_url"] for s in obj.sections or [] if s.get("image_url")]
+            + list(obj.gallery_images or []),
             "datePublished": obj.published_at.isoformat() if obj.published_at else None,
             "dateModified": obj.updated_at.isoformat(),
             "author": {
@@ -163,15 +166,69 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
             self.get_schema_org_article(obj), self.get_schema_org_breadcrumb(obj)]}
 
 
+SECTION_LIMITS = {"heading": 200, "body": 20000, "image_url": 500, "image_caption": 300}
+MAX_SECTIONS = 30
+
+
+def sections_to_markdown(sections):
+    """The Markdown mirror of a sectioned article: `## heading` then the section's text."""
+    blocks = []
+    for section in sections:
+        if section["heading"]:
+            blocks.append(f"## {section['heading']}")
+        if section["body"]:
+            blocks.append(section["body"])
+    return "\n\n".join(blocks)
+
+
 class TravelGuideWriteSerializer(serializers.ModelSerializer):
     slug = serializers.SlugField(required=False, allow_blank=True, max_length=255)
+    # Optional on the wire: a sectioned article rebuilds it from its sections.
+    markdown_content = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = TravelGuide
         fields = ['id', 'destination', 'author', 'title', 'slug', 'country', 'region', 'category',
-                  'markdown_content', 'hero_image_url', 'gallery_images', 'meta_title', 'meta_description',
-                  'canonical_url', 'is_published', 'published_at']
+                  'markdown_content', 'sections', 'hero_image_url', 'gallery_images', 'meta_title',
+                  'meta_description', 'canonical_url', 'is_published', 'published_at']
         read_only_fields = ['id', 'author', 'published_at']
+
+    def validate_sections(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Sections must be a list.")
+        if len(value) > MAX_SECTIONS:
+            raise serializers.ValidationError(f"An article can have at most {MAX_SECTIONS} sections.")
+        cleaned = []
+        for index, raw in enumerate(value, start=1):
+            if not isinstance(raw, dict):
+                raise serializers.ValidationError(f"Section {index} is not valid.")
+            section = {}
+            for key, limit in SECTION_LIMITS.items():
+                text = raw.get(key) or ""
+                if not isinstance(text, str):
+                    raise serializers.ValidationError(f"Section {index}: {key.replace('_', ' ')} must be text.")
+                text = text.strip()
+                if len(text) > limit:
+                    raise serializers.ValidationError(
+                        f"Section {index}: {key.replace('_', ' ')} is longer than {limit} characters."
+                    )
+                section[key] = text
+            url = section["image_url"]
+            if url and not (url.startswith(("https://", "http://")) or (url.startswith("/") and not url.startswith("//"))):
+                raise serializers.ValidationError(f"Section {index}: the photo link is not valid.")
+            if not (section["heading"] or section["body"] or url):
+                continue  # A completely empty card is dropped, not an error.
+            cleaned.append(section)
+        return cleaned
+
+    def validate(self, attrs):
+        if "sections" in attrs and attrs["sections"]:
+            attrs["markdown_content"] = sections_to_markdown(attrs["sections"])
+        elif self.instance is None and not (attrs.get("markdown_content") or "").strip():
+            raise serializers.ValidationError({"sections": "Add at least one section to the article."})
+        elif "markdown_content" in attrs and not attrs["markdown_content"].strip() and not attrs.get("sections"):
+            raise serializers.ValidationError({"sections": "Add at least one section to the article."})
+        return attrs
 
     def create(self, validated_data):
         if not validated_data.get("slug"):

@@ -63,6 +63,10 @@ class TravelGuideDetailView(GuideQuerysetMixin, generics.RetrieveUpdateDestroyAP
         return Response(TravelGuideDetailSerializer(serializer.save()).data)
 
     def perform_destroy(self, instance):
+        # ?permanent=true removes the post and its comments; plain DELETE only unpublishes it.
+        if self.request.query_params.get("permanent", "").lower() in ("1", "true"):
+            instance.delete()
+            return
         TravelGuide.objects.filter(pk=instance.pk).update(is_published=False, updated_at=timezone.now())
 
 
