@@ -8,6 +8,7 @@ from .task_views import TaskListCreateView, MyTasksView, TaskDetailUpdateView
 from .tag_views import TagListCreateView, InquiryTagView
 from .customer_views import CustomerDetailView
 from .crm_analytics_views import PipelineSummaryView, FunnelView, TrekPipelineView
+from .revenue_views import RevenueAnalyticsView, RevenueEntryDetailView, RevenueEntryListCreateView
 from .assignment_views import (
     BulkAssignView,
     LeadAssignmentRuleDetailView,
@@ -34,4 +35,7 @@ __all__ = [
     "LeadAssignmentRuleListCreateView",
     "LeadAssignmentRuleDetailView",
     "LeadsByDepartureView",
+    "RevenueAnalyticsView",
+    "RevenueEntryListCreateView",
+    "RevenueEntryDetailView",
 ]

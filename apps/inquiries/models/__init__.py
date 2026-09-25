@@ -6,6 +6,7 @@ from .activity import Activity, ActivityChannel, OUTREACH_CHANNELS
 from .task import Task, TaskStatus
 from .tag import Tag
 from .assignment_rule import LeadAssignmentRule, OPEN_LEAD_STATUSES, resolve_agent
+from .revenue_entry import RevenueEntry
 
 __all__ = [
     "Inquiry",
@@ -25,4 +26,5 @@ __all__ = [
     "LeadAssignmentRule",
     "OPEN_LEAD_STATUSES",
     "resolve_agent",
+    "RevenueEntry",
 ]

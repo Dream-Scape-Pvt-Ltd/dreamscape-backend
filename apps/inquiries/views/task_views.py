@@ -78,3 +78,10 @@ class TaskDetailUpdateView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ("PATCH", "PUT"):
             return TaskUpdateSerializer
         return TaskSerializer
+
+    def update(self, request, *args, **kwargs):
+        # Validate with the narrow update serializer, but answer with the full
+        # task so clients can keep using its id, inquiry and agent.
+        response = super().update(request, *args, **kwargs)
+        response.data = TaskSerializer(self.get_object(), context=self.get_serializer_context()).data
+        return response

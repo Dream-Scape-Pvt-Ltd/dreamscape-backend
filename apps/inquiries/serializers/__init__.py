@@ -13,6 +13,7 @@ from .activity_serializers import ActivitySerializer, ActivityCreateSerializer
 from .task_serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer
 from .tag_serializers import TagSerializer
 from .customer_serializers import CustomerSerializer
+from .revenue_serializers import RevenueEntrySerializer
 
 __all__ = [
     "InquiryCreateSerializer",
@@ -29,4 +30,5 @@ __all__ = [
     "TaskUpdateSerializer",
     "TagSerializer",
     "CustomerSerializer",
+    "RevenueEntrySerializer",
 ]

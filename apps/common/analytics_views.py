@@ -1,6 +1,5 @@
 import datetime
 from django.utils import timezone
-from django.db.models import Sum, Count, Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,7 +8,6 @@ from apps.common.permissions import IsSalesAgentOrAdmin
 from apps.trips.models import Trip, TripDeparture
 from apps.inquiries.models import Inquiry
 from apps.bookings.models import Booking
-from apps.payments.models import PaymentTransaction
 from apps.content_cms.models import TravelGuide
 
 
@@ -86,77 +84,28 @@ class DashboardAnalyticsView(APIView):
             future_departures = TripDeparture.objects.filter(start_date__gte=today).count()
             active_expeditions = max(traveling_inquiries, future_departures, 1 if total_treks > 0 and Booking.objects.filter(status__in=["DEPOSIT_PAID", "FULLY_PAID"]).exists() else 0)
 
-        # 4. Revenue Metrics
-        # Current month
-        current_month_booking_rev = Booking.objects.filter(
-            status__in=["DEPOSIT_PAID", "FULLY_PAID"],
-            created_at__gte=start_of_current_month,
-        ).aggregate(total=Sum("amount_paid_usd"))["total"] or 0
+        # 4 & 5. Revenue — earned when a trek completes (plus manual entries).
+        # Shares one calculation with the Revenue page so the two always agree.
+        from apps.inquiries.services.revenue import revenue_summary
 
-        current_month_payment_rev = PaymentTransaction.objects.filter(
-            status="SUCCESS",
-            created_at__gte=start_of_current_month,
-        ).aggregate(total=Sum("amount"))["total"] or 0
+        revenue = revenue_summary(6)
+        current_month_revenue = revenue["totals"]["this_month"]
+        last_month_revenue = revenue["totals"]["last_month"]
+        total_revenue = revenue["totals"]["all_time"]
+        mom_growth_percent = revenue["totals"]["mom_growth_percent"] or 0.0
 
-        current_month_revenue = float(max(current_month_booking_rev, current_month_payment_rev))
-
-        # Start of last month
-        if start_of_current_month.month == 1:
-            start_of_last_month = start_of_current_month.replace(year=start_of_current_month.year - 1, month=12)
-        else:
-            start_of_last_month = start_of_current_month.replace(month=start_of_current_month.month - 1)
-
-        last_month_booking_rev = Booking.objects.filter(
-            status__in=["DEPOSIT_PAID", "FULLY_PAID"],
-            created_at__gte=start_of_last_month,
-            created_at__lt=start_of_current_month,
-        ).aggregate(total=Sum("amount_paid_usd"))["total"] or 0
-
-        last_month_payment_rev = PaymentTransaction.objects.filter(
-            status="SUCCESS",
-            created_at__gte=start_of_last_month,
-            created_at__lt=start_of_current_month,
-        ).aggregate(total=Sum("amount"))["total"] or 0
-
-        last_month_revenue = float(max(last_month_booking_rev, last_month_payment_rev))
-
-        total_revenue = float(
-            Booking.objects.filter(status__in=["DEPOSIT_PAID", "FULLY_PAID"]).aggregate(total=Sum("amount_paid_usd"))["total"] or
-            PaymentTransaction.objects.filter(status="SUCCESS").aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        if last_month_revenue > 0:
-            mom_growth_percent = round(((current_month_revenue - last_month_revenue) / last_month_revenue) * 100, 1)
-        elif current_month_revenue > 0:
-            mom_growth_percent = 100.0
-        else:
-            mom_growth_percent = 0.0
-
-        # 5. Monthly Revenue Trend (Last 6 Months)
         monthly_trends = []
-        for i in range(5, -1, -1):
-            year = current_time.year
-            month = current_time.month - i
-            while month <= 0:
-                month += 12
-                year -= 1
-            
-            m_start = datetime.datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-            if month == 12:
-                m_end = datetime.datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-            else:
-                m_end = datetime.datetime(year, month + 1, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-
-            m_bookings = Booking.objects.filter(created_at__gte=m_start, created_at__lt=m_end)
-            m_paid = m_bookings.filter(status__in=["DEPOSIT_PAID", "FULLY_PAID"]).aggregate(total=Sum("amount_paid_usd"))["total"] or 0
-            m_inquiries = Inquiry.objects.filter(created_at__gte=m_start, created_at__lt=m_end).count()
-
+        for row in revenue["monthly"]:
+            year, month = (int(part) for part in row["month"].split("-"))
+            m_start = datetime.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
+            m_end = datetime.datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=timezone.get_current_timezone())
             monthly_trends.append({
-                "month_label": m_start.strftime("%b"),
+                "month_label": row["label"],
                 "full_label": m_start.strftime("%b %Y"),
-                "revenue": float(m_paid),
-                "bookings_count": m_bookings.count(),
-                "inquiries_count": m_inquiries,
+                "revenue": row["revenue"],
+                "bookings_count": row["new_bookings"],
+                "completed_trips": row["completed_trips"],
+                "inquiries_count": Inquiry.objects.filter(created_at__gte=m_start, created_at__lt=m_end).count(),
             })
 
         # 6. Status Breakdown

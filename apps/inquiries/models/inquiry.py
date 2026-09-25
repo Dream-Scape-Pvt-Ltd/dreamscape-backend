@@ -130,6 +130,12 @@ class Inquiry(TimeStampedModel):
         blank=True,
         help_text="Departure price x travelers, recorded when the trip completes.",
     )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="When the trip completed; its revenue is counted in this month.",
+    )
     first_response_at = models.DateTimeField(null=True, blank=True)
     sla_breached = models.BooleanField(default=False, db_index=True)
     tags = models.ManyToManyField("inquiries.Tag", blank=True, related_name="inquiries")

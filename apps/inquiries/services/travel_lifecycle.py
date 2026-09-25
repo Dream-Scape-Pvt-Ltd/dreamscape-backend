@@ -121,8 +121,12 @@ def transition_status(inquiry, new_status, *, author=None, departure=None, trave
 
         if new_status == InquiryStatus.COMPLETED:
             inquiry.revenue_usd = _trip_revenue(inquiry)
-        elif will_hold:
-            inquiry.revenue_usd = None
+            inquiry.completed_at = timezone.now()
+        else:
+            # Leaving COMPLETED takes the trip's revenue back out of its month.
+            inquiry.completed_at = None
+            if will_hold:
+                inquiry.revenue_usd = None
 
         inquiry.status = new_status
         inquiry.save()

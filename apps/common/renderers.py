@@ -32,8 +32,10 @@ class DreamscapeJSONRenderer(JSONRenderer):
         if response is not None:
             message = getattr(response, "success_message", None)
 
-        if message is None and isinstance(data, dict):
-            message = data.pop("message", None)
+        # Only a message-only body ({"message": "..."}) is lifted into the envelope.
+        # Records such as inquiries have their own "message" field, which must stay in data.
+        if message is None and isinstance(data, dict) and set(data) == {"message"}:
+            message = data.pop("message")
 
         envelope = {
             "success": status_code < 400,
