@@ -3,7 +3,7 @@ apps.content_cms URL configuration -- Phase 0 stub.
 Endpoints will be registered in their respective implementation phase.
 """
 from django.urls import path
-from apps.content_cms.views import GuideCommentDetailView, GuideCommentListCreateView, GuideImageUploadView, GuideViewCountView, TravelGuideListCreateView, TravelGuideDetailView, ResponsibleTravelListCreateView, ResponsibleTravelDetailView
+from apps.content_cms.views import GuideCommentDetailView, GuideCommentListCreateView, GuideImageUploadView, GuideViewCountView, TravelGuideListCreateView, TravelGuideDetailView, ResponsibleTravelListCreateView, ResponsibleTravelDetailView, TrekGuideListCreateView, TrekGuideDetailView
 
 app_name = 'content_cms'
 
@@ -16,4 +16,6 @@ urlpatterns = [
     path('guides/<slug:slug>/', TravelGuideDetailView.as_view(), name='guide-detail'),
     path('responsible-travel/', ResponsibleTravelListCreateView.as_view(), name='initiative-list'),
     path('responsible-travel/<slug:slug>/', ResponsibleTravelDetailView.as_view(), name='initiative-detail'),
+    path('trek-guides/', TrekGuideListCreateView.as_view(), name='trek-guide-list'),
+    path('trek-guides/<slug:slug>/', TrekGuideDetailView.as_view(), name='trek-guide-detail'),
 ]

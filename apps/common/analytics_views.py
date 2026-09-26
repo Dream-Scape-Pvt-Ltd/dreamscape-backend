@@ -163,7 +163,7 @@ class DashboardAnalyticsView(APIView):
                 "id": f"tr_{tr.id}",
                 "type": "TREK",
                 "title": f"Trek updated: {tr.title}",
-                "description": f"{tr.duration_days} Days · Grade {tr.difficulty_grade.replace('GRADE_', '')} · Starting ${float(tr.starting_price_usd):,.0f}",
+                "description": f"{tr.duration_days} Days · {tr.get_difficulty_grade_display()} · Starting ${float(tr.starting_price_usd):,.0f}",
                 "timestamp": tr.updated_at.isoformat(),
                 "relative_time": format_relative_time(tr.updated_at),
                 "status": "ACTIVE" if tr.is_active else "INACTIVE",

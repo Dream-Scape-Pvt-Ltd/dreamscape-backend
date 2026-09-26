@@ -8,6 +8,7 @@ from apps.trips.models import DepartureStatus, PeakExpeditionDetail, Trip
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
 from apps.trips.serializers.itinerary_serializers import ItineraryDaySerializer
 from apps.trips.serializers.review_serializers import TripReviewReadSerializer
+from apps.content_cms.serializers.trek_guide_serializers import TrekGuideSummarySerializer
 
 
 class PeakExpeditionDetailSerializer(serializers.ModelSerializer):
@@ -36,6 +37,7 @@ class TripListSerializer(serializers.ModelSerializer):
 
     destination_name = serializers.CharField(source="destination.name", read_only=True)
     destination_slug = serializers.CharField(source="destination.slug", read_only=True)
+    destination_id = serializers.UUIDField(source="destination.id", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_slug = serializers.CharField(source="category.slug", read_only=True)
     rating_avg = serializers.SerializerMethodField()
@@ -49,6 +51,7 @@ class TripListSerializer(serializers.ModelSerializer):
             "slug",
             "destination_name",
             "destination_slug",
+            "destination_id",
             "category_name",
             "category_slug",
             "duration_days",
@@ -95,6 +98,7 @@ class TripDetailSerializer(serializers.ModelSerializer):
     reviews = serializers.SerializerMethodField()
     rating_summary = serializers.SerializerMethodField()
     schema_org_json_ld = serializers.SerializerMethodField()
+    trek_guides = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
@@ -126,10 +130,16 @@ class TripDetailSerializer(serializers.ModelSerializer):
             "reviews",
             "rating_summary",
             "schema_org_json_ld",
+            "trek_guides",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_trek_guides(self, obj) -> list:
+        """Published guides who lead this trek, for the "Your guides" line on its page."""
+        guides = [guide for guide in obj.trek_guides.all() if guide.is_published]
+        return TrekGuideSummarySerializer(guides, many=True).data
 
     def get_departures(self, obj):
         # Full and waitlist-only batches are included deliberately: the public

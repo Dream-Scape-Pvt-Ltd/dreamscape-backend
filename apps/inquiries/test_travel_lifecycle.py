@@ -35,7 +35,7 @@ class TravelLifecycleTests(APITestCase):
             title="Everest Base Camp",
             slug="everest-base-camp",
             duration_days=14,
-            difficulty_grade="GRADE_3",
+            difficulty_grade="DIFFICULT",
             starting_price_usd=Decimal("1500"),
             overview="Everest trekking",
         )

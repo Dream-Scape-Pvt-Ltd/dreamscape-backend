@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative
+from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative, TrekGuide
 
 
 @admin.register(TravelGuide)
@@ -16,3 +16,12 @@ class ResponsibleTravelInitiativeAdmin(admin.ModelAdmin):
     list_filter = ("is_published",)
     search_fields = ("title", "content")
     prepopulated_fields = {"slug": ("title",)}
+
+
+@admin.register(TrekGuide)
+class TrekGuideAdmin(admin.ModelAdmin):
+    list_display = ("name", "role", "years_experience", "is_published", "display_order")
+    list_filter = ("is_published",)
+    search_fields = ("name", "role", "bio")
+    filter_horizontal = ("regions", "treks_led")
+    prepopulated_fields = {"slug": ("name",)}

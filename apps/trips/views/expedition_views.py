@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from apps.common.permissions import IsAdminRole
 from apps.trips.models import PeakExpeditionDetail, Trip
 from apps.trips.serializers import PeakExpeditionDetailSerializer
+from apps.common.lookups import ref_filter
 
 
 class ExpeditionDetailView(APIView):
@@ -22,7 +23,7 @@ class ExpeditionDetailView(APIView):
         return [AllowAny()]
 
     def get_trip(self, slug):
-        trip = Trip.objects.filter(slug=slug).first()
+        trip = Trip.objects.filter(**ref_filter(slug)).first()
         if not trip:
             raise NotFound(detail=f"Trip with slug '{slug}' not found.")
         return trip

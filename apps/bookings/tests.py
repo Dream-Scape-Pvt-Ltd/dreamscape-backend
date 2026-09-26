@@ -57,7 +57,7 @@ class BookingAPITests(APITestCase):
             slug="everest-base-camp-trek",
             duration_days=14,
             altitude_max_meters=5364,
-            difficulty_grade=DifficultyGrade.GRADE_4,
+            difficulty_grade=DifficultyGrade.DIFFICULT,
             starting_price_usd=Decimal("1500.00"),
             overview="Iconic trek to EBC",
         )

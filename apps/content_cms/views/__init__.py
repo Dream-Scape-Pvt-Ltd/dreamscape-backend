@@ -6,3 +6,4 @@ Example:
 """
 from .guide_views import GuideCommentDetailView, GuideCommentListCreateView, GuideImageUploadView, GuideViewCountView, TravelGuideListCreateView, TravelGuideDetailView
 from .initiative_views import ResponsibleTravelListCreateView, ResponsibleTravelDetailView
+from .trek_guide_views import TrekGuideListCreateView, TrekGuideDetailView

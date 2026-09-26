@@ -8,7 +8,7 @@ from PIL import Image
 from rest_framework.test import APITestCase
 from apps.common.testing import PortalFixtures
 from apps.common.models import MediaAsset
-from apps.content_cms.models import BlogComment, TravelGuide, ResponsibleTravelInitiative
+from apps.content_cms.models import BlogComment, TravelGuide, ResponsibleTravelInitiative, TrekGuide
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -184,3 +184,72 @@ class ContentAPITests(PortalFixtures, APITestCase):
             'title': 'New pledge', 'slug': 'new-pledge', 'content': 'Community', 'pillars': ['Community'],
             'is_published': True}, format='json')
         self.assertEqual(response.status_code, 201, response.data)
+
+
+@override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
+class TrekGuideAPITests(PortalFixtures, APITestCase):
+    list_url = '/api/v1/content/trek-guides/'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.published = TrekGuide.objects.create(name='Santa Bahadur Tamang', slug='santa-bahadur-tamang',
+            role='Lead trekking guide', years_experience=20, languages=['English', 'Nepali'], is_published=True)
+        cls.published.regions.add(cls.destination)
+        cls.published.treks_led.add(cls.trip)
+        cls.draft = TrekGuide.objects.create(name='Draft Guide', slug='draft-guide')
+
+    def test_public_sees_only_published_guides(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([g['slug'] for g in response.data['results']], ['santa-bahadur-tamang'])
+        self.assertEqual(response.data['results'][0]['regions'], [{'id': str(self.destination.id), 'slug': 'everest-nepal', 'name': 'Everest Nepal'}])
+        self.assertEqual(self.client.get(f'{self.list_url}draft-guide/').status_code, 404)
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.get(self.list_url).data['count'], 2)
+
+    def test_detail_lists_active_treks_led(self):
+        response = self.client.get(f'{self.list_url}santa-bahadur-tamang/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([t['slug'] for t in response.data['treks_led']], ['everest-base-camp'])
+        self.trip.is_active = False
+        self.trip.save(update_fields=['is_active'])
+        self.assertEqual(self.client.get(f'{self.list_url}santa-bahadur-tamang/').data['treks_led'], [])
+
+    def test_admin_creates_and_updates_with_slugs(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(self.list_url, {
+            'name': 'Pemba Sherpa', 'slug': 'pemba-sherpa', 'languages': [' English ', 'English', 'Sherpa'],
+            'regions': ['everest-nepal'], 'treks_led': ['everest-base-camp'], 'is_published': True}, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['languages'], ['English', 'Sherpa'])
+        self.assertEqual(response.data['treks_led'][0]['slug'], 'everest-base-camp')
+        response = self.client.patch(f'{self.list_url}pemba-sherpa/', {'role': 'Assistant guide', 'regions': []}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['role'], 'Assistant guide')
+        self.assertEqual(response.data['regions'], [])
+
+    def test_rejects_bad_input_and_duplicate_slug(self):
+        self.client.force_authenticate(self.admin)
+        duplicate = self.client.post(self.list_url, {'name': 'Another', 'slug': 'santa-bahadur-tamang'}, format='json')
+        self.assertEqual(duplicate.status_code, 400)
+        bad = self.client.post(self.list_url, {'name': 'X', 'slug': 'x', 'languages': 'English', 'treks_led': ['no-such-trek']}, format='json')
+        self.assertEqual(bad.status_code, 400)
+
+    def test_customers_cannot_write(self):
+        self.client.force_authenticate(self.customer)
+        self.assertEqual(self.client.post(self.list_url, {'name': 'X', 'slug': 'x'}, format='json').status_code, 403)
+        self.assertEqual(self.client.delete(f'{self.list_url}santa-bahadur-tamang/').status_code, 403)
+
+    def test_delete_unpublishes_unless_permanent(self):
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.delete(f'{self.list_url}santa-bahadur-tamang/').status_code, 204)
+        self.published.refresh_from_db()
+        self.assertFalse(self.published.is_published)
+        self.assertEqual(self.client.delete(f'{self.list_url}santa-bahadur-tamang/?permanent=true').status_code, 204)
+        self.assertFalse(TrekGuide.objects.filter(slug='santa-bahadur-tamang').exists())
+
+    def test_trip_detail_names_its_published_guides(self):
+        response = self.client.get(f'/api/v1/trips/{self.trip.slug}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([g['slug'] for g in response.data['trek_guides']], ['santa-bahadur-tamang'])

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from apps.common.permissions import IsAdminRole
 from apps.trips.models import ItineraryDay, Trip
 from apps.trips.serializers import ItineraryDaySerializer
+from apps.common.lookups import ref_filter
 
 
 class ItineraryView(generics.ListCreateAPIView):
@@ -23,7 +24,7 @@ class ItineraryView(generics.ListCreateAPIView):
 
     def get_trip(self):
         slug = self.kwargs.get("slug")
-        trip = Trip.objects.filter(slug=slug).first()
+        trip = Trip.objects.filter(**ref_filter(slug)).first()
         if not trip:
             raise NotFound(detail=f"Trip with slug '{slug}' not found.")
         return trip
@@ -77,7 +78,7 @@ class ItineraryDayDetailView(generics.RetrieveUpdateDestroyAPIView):
         slug = self.kwargs.get("slug")
         day_number = self.kwargs.get("day_number")
         try:
-            return ItineraryDay.objects.get(trip__slug=slug, day_number=day_number)
+            return ItineraryDay.objects.get(**ref_filter(slug, "trip__"), day_number=day_number)
         except ItineraryDay.DoesNotExist:
             raise NotFound(detail=f"Itinerary day {day_number} not found for trip '{slug}'.")
 

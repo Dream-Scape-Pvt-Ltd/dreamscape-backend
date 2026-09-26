@@ -69,7 +69,7 @@ class InquiryAPITests(APITestCase):
             title="Annapurna Circuit Trek",
             slug="annapurna-circuit-trek",
             duration_days=16,
-            difficulty_grade=DifficultyGrade.GRADE_3,
+            difficulty_grade=DifficultyGrade.DIFFICULT,
             starting_price_usd=Decimal("1800.00"),
             overview="Classic Annapurna loop crossing Thorong La.",
         )

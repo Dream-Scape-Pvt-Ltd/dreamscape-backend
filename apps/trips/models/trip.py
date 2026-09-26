@@ -3,12 +3,10 @@ from apps.common.models.base import TimeStampedModel
 
 
 class DifficultyGrade(models.TextChoices):
-    GRADE_1 = "GRADE_1", "Grade 1 - Easy"
-    GRADE_2 = "GRADE_2", "Grade 2 - Moderate"
-    GRADE_3 = "GRADE_3", "Grade 3 - Demanding"
-    GRADE_4 = "GRADE_4", "Grade 4 - Strenuous"
-    GRADE_5 = "GRADE_5", "Grade 5 - Challenging"
-    ALPINE = "ALPINE", "Alpine / Technical"
+    EASY = "EASY", "Easy"
+    NORMAL = "NORMAL", "Normal"
+    DIFFICULT = "DIFFICULT", "Difficult"
+    EXTREME = "EXTREME", "Extreme"
 
 
 class Trip(TimeStampedModel):

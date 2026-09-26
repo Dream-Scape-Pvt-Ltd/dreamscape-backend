@@ -8,22 +8,29 @@ from apps.faq.models import FAQ
 from apps.trips.models import Trip
 
 
+def link(prefix):
+    """Public pages open content by id (/treks?id=<uuid>); the FAQ page has no per-item address."""
+    if prefix == '/faq':
+        return Value(prefix, output_field=CharField())
+    return Concat(Value(prefix), Cast('id', CharField()), output_field=CharField())
+
+
 def global_search_queryset(query_text, entity_type=None):
     """One UNION query: global ranking/pagination without loading all results into Python."""
     query = SearchQuery(query_text.strip())
     sources = [
         ('trip', Trip.objects.filter(is_active=True),
          SearchVector('title', 'slug', weight='A') + SearchVector('overview', weight='B'),
-         F('title'), F('slug'), F('overview'), '/trips/',
+         F('title'), F('slug'), F('overview'), '/treks?id=',
          JSONObject(duration_days=F('duration_days'),
                     starting_price_usd=Cast('starting_price_usd', CharField()),
                     difficulty_grade=F('difficulty_grade'))),
         ('destination', Destination.objects.filter(is_active=True),
          SearchVector('name', 'region_name', weight='A'),
-         F('name'), F('slug'), F('region_name'), '/destinations/', JSONObject(country=F('country'))),
+         F('name'), F('slug'), F('region_name'), '/destinations?id=', JSONObject(country=F('country'))),
         ('guide', TravelGuide.objects.filter(is_published=True),
          SearchVector('title', weight='A') + SearchVector('markdown_content', weight='C'),
-         F('title'), F('slug'), F('markdown_content'), '/guides/', JSONObject(category=F('category'))),
+         F('title'), F('slug'), F('markdown_content'), '/blog?id=', JSONObject(category=F('category'))),
         ('faq', FAQ.objects.filter(is_active=True).filter(
             Q(trip__isnull=True) | Q(trip__is_active=True)).filter(
             Q(destination__isnull=True) | Q(destination__is_active=True)),
@@ -39,7 +46,7 @@ def global_search_queryset(query_text, entity_type=None):
         queries.append(qs.order_by().values('id').annotate(
             entity_type=Value(kind, output_field=CharField()), title=title, slug=slug,
             snippet=Substr(Coalesce(snippet, Value(''), output_field=CharField()), 1, 160),
-            rank_score=F('search_rank'), url=Concat(Value(prefix), slug, output_field=CharField()), meta=meta,
+            rank_score=F('search_rank'), url=link(prefix), meta=meta,
         ))
     if not queries:
         raise ValueError('Unknown search entity type.')

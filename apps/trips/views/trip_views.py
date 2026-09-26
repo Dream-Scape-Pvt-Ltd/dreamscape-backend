@@ -9,6 +9,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.lookups import SlugOrIdLookupMixin
 from apps.common.models import MediaAsset
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import TripFilter
@@ -152,9 +153,9 @@ class TripListCreateView(generics.ListCreateAPIView):
         return response
 
 
-class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
+class TripDetailView(SlugOrIdLookupMixin, generics.RetrieveUpdateDestroyAPIView):
     """
-    Complete trip details by slug, including itineraries, departures, reviews,
+    Complete trip details by slug or id, including itineraries, departures, reviews,
     and Schema.org TouristTrip JSON-LD.
     Admins can update or delete trips.
     """
@@ -174,7 +175,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Trip.objects.select_related(
             "destination", "category", "expedition_detail"
-        ).prefetch_related("itinerary_days", "departures", "reviews")
+        ).prefetch_related("itinerary_days", "departures", "reviews", "trek_guides")
 
     @extend_schema(
         tags=["Trips"],

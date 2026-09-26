@@ -58,7 +58,7 @@ class CRMTestBase(APITestCase):
             title="Annapurna Circuit",
             slug="annapurna-circuit",
             duration_days=16,
-            difficulty_grade="GRADE_3",
+            difficulty_grade="DIFFICULT",
             starting_price_usd=Decimal("1500.00"),
             overview="Annapurna circuit trek",
         )
@@ -68,7 +68,7 @@ class CRMTestBase(APITestCase):
             title="Everest Base Camp",
             slug="everest-base-camp",
             duration_days=14,
-            difficulty_grade="GRADE_3",
+            difficulty_grade="DIFFICULT",
             starting_price_usd=Decimal("1800.00"),
             overview="EBC trek",
         )

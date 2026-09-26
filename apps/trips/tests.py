@@ -64,7 +64,7 @@ class TripCatalogTests(APITestCase):
             slug="everest-base-camp-trek",
             duration_days=14,
             altitude_max_meters=5364,
-            difficulty_grade=DifficultyGrade.GRADE_3,
+            difficulty_grade=DifficultyGrade.DIFFICULT,
             min_group_size=2,
             max_group_size=12,
             best_seasons=["Spring", "Autumn"],
@@ -122,7 +122,7 @@ class TripCatalogTests(APITestCase):
         self.assertEqual(res_price["data"]["count"], 1)
 
         # Filter by difficulty
-        res_diff = self.client.get(f"{url}?difficulty_grade=GRADE_3").json()
+        res_diff = self.client.get(f"{url}?difficulty_grade=DIFFICULT").json()
         self.assertEqual(res_diff["data"]["count"], 1)
 
         # Filter by season
@@ -139,7 +139,7 @@ class TripCatalogTests(APITestCase):
             "slug": "gokyo-lakes-cho-la-pass",
             "duration_days": 16,
             "altitude_max_meters": 5420,
-            "difficulty_grade": DifficultyGrade.GRADE_4,
+            "difficulty_grade": DifficultyGrade.DIFFICULT,
             "starting_price_usd": "1890.00",
             "overview": "High passes and turquoise glacial lakes.",
             "is_active": True,
@@ -159,7 +159,7 @@ class TripCatalogTests(APITestCase):
             "title": "Unauthorized Trip",
             "slug": "unauthorized-trip",
             "duration_days": 5,
-            "difficulty_grade": DifficultyGrade.GRADE_1,
+            "difficulty_grade": DifficultyGrade.EASY,
             "starting_price_usd": "500.00",
             "overview": "Should be rejected.",
         }
@@ -371,7 +371,7 @@ class TripHighlightTests(APITestCase):
                 slug=f"himalayan-trek-{i}",
                 duration_days=10 + i,
                 altitude_max_meters=4000 + i * 200,
-                difficulty_grade=DifficultyGrade.GRADE_2,
+                difficulty_grade=DifficultyGrade.NORMAL,
                 min_group_size=2,
                 max_group_size=12,
                 starting_price_usd=1200.00 + i * 100,
@@ -388,7 +388,7 @@ class TripHighlightTests(APITestCase):
             slug="inactive-trek",
             duration_days=5,
             altitude_max_meters=3000,
-            difficulty_grade=DifficultyGrade.GRADE_1,
+            difficulty_grade=DifficultyGrade.EASY,
             starting_price_usd=800.00,
             overview="Not currently active.",
             is_active=False,

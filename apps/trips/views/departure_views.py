@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.common.lookups import ref_filter
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import DepartureCapacityFilter
 from apps.trips.models import Trip, TripDeparture
@@ -33,7 +34,7 @@ class DepartureListCreateView(generics.ListCreateAPIView):
 
     def get_trip(self):
         slug = self.kwargs.get("slug")
-        trip = Trip.objects.filter(slug=slug).first()
+        trip = Trip.objects.filter(**ref_filter(slug)).first()
         if not trip:
             raise NotFound(detail=f"Trip with slug '{slug}' not found.")
         return trip
@@ -134,7 +135,7 @@ class DepartureDetailView(generics.RetrieveUpdateDestroyAPIView):
         slug = self.kwargs.get("slug")
         dep_id = self.kwargs.get("departure_id")
         try:
-            return TripDeparture.objects.get(trip__slug=slug, pk=dep_id)
+            return TripDeparture.objects.get(**ref_filter(slug, "trip__"), pk=dep_id)
         except TripDeparture.DoesNotExist:
             raise NotFound(detail=f"Departure '{dep_id}' not found for trip '{slug}'.")
 

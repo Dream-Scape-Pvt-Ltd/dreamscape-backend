@@ -4,6 +4,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.common.lookups import ref_filter
 from apps.common.permissions import IsAdminRole
 from apps.trips.models import Trip, TripReview
 from apps.trips.serializers import (
@@ -28,7 +29,7 @@ class ReviewListCreateView(generics.ListCreateAPIView):
 
     def get_trip(self):
         slug = self.kwargs.get("slug")
-        trip = Trip.objects.filter(slug=slug).first()
+        trip = Trip.objects.filter(**ref_filter(slug)).first()
         if not trip:
             raise NotFound(detail=f"Trip with slug '{slug}' not found.")
         return trip
@@ -84,7 +85,7 @@ class ReviewModerationView(generics.UpdateAPIView):
         slug = self.kwargs.get("slug")
         review_id = self.kwargs.get("review_id")
         try:
-            return TripReview.objects.get(trip__slug=slug, pk=review_id)
+            return TripReview.objects.get(**ref_filter(slug, "trip__"), pk=review_id)
         except TripReview.DoesNotExist:
             raise NotFound(detail=f"Review '{review_id}' not found for trip '{slug}'.")
 

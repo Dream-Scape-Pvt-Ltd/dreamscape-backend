@@ -103,7 +103,7 @@ class DatabaseArchitectureTestCase(TestCase):
             slug="everest-base-camp-gokyo-lakes",
             duration_days=16,
             altitude_max_meters=5364,
-            difficulty_grade=DifficultyGrade.GRADE_4,
+            difficulty_grade=DifficultyGrade.DIFFICULT,
             min_group_size=2,
             max_group_size=12,
             best_seasons=["SPRING", "AUTUMN"],

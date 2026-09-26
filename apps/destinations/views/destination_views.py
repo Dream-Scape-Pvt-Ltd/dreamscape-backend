@@ -5,6 +5,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.common.lookups import SlugOrIdLookupMixin
 from apps.common.permissions import IsAdminRole
 from apps.destinations.models import Destination
 from apps.destinations.serializers import (
@@ -73,9 +74,9 @@ class DestinationListCreateView(generics.ListCreateAPIView):
         return response
 
 
-class DestinationDetailView(generics.RetrieveUpdateDestroyAPIView):
+class DestinationDetailView(SlugOrIdLookupMixin, generics.RetrieveUpdateDestroyAPIView):
     """
-    Detailed destination landing page by slug.
+    Detailed destination landing page by slug or id.
     Admins can update or delete destinations.
     """
 

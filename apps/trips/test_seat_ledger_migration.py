@@ -45,7 +45,7 @@ class SeatLedgerMigrationTests(TransactionTestCase):
             title="Annapurna Circuit",
             slug="annapurna-circuit-mig",
             duration_days=16,
-            difficulty_grade="GRADE_3",
+            difficulty_grade="DIFFICULT",
             starting_price_usd=Decimal("1500.00"),
             overview="Migration fixture",
         )
