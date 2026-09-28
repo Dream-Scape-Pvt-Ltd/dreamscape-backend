@@ -78,6 +78,14 @@ class TripListSerializer(serializers.ModelSerializer):
         return obj.reviews.filter(is_published=True).count()
 
 
+class TripGuideSummarySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    slug = serializers.CharField()
+    name = serializers.CharField()
+    role = serializers.CharField()
+    photo_url = serializers.CharField()
+
+
 class TripDetailSerializer(serializers.ModelSerializer):
     """
     Complete trip detail view with rich nested relations and Schema.org TouristTrip JSON-LD.
@@ -86,6 +94,7 @@ class TripDetailSerializer(serializers.ModelSerializer):
         prefetch_related: 'itinerary_days', 'departures', 'reviews'
     """
 
+    trek_guides = TripGuideSummarySerializer(source="published_guides", many=True, read_only=True)
     destination = DestinationListSerializer(read_only=True)
     category = ActivityCategorySerializer(read_only=True)
     expedition_detail = PeakExpeditionDetailSerializer(read_only=True)
@@ -121,6 +130,7 @@ class TripDetailSerializer(serializers.ModelSerializer):
             "is_active",
             "expedition_detail",
             "itinerary_days",
+            "trek_guides",
             "departures",
             "reviews",
             "rating_summary",

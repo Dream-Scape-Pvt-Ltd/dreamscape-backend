@@ -18,8 +18,9 @@ class DestinationListSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "country",
-            "region_name",
+            "region_name", "headline", "description", "highlights", "trail_style", "pace", "base", "mood",
             "hero_media",
+            "gallery_images",
             "trips_count",
             "is_active",
         ]
@@ -49,10 +50,11 @@ class DestinationDetailSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "country",
-            "region_name",
+            "region_name", "headline", "description", "highlights", "trail_style", "pace", "base", "mood",
             "visa_guidelines",
             "permit_details",
             "hero_media",
+            "gallery_images",
             "trips_count",
             "meta_title",
             "meta_description",
@@ -101,10 +103,18 @@ class DestinationWriteSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "country",
-            "region_name",
+            "region_name", "headline", "description", "highlights", "trail_style", "pace", "base", "mood",
             "visa_guidelines",
             "permit_details",
             "hero_media",
+            "gallery_images",
             "is_active",
         ]
         read_only_fields = ["id"]
+
+    def validate_gallery_images(self, images):
+        if not isinstance(images, list) or len(images) > 12:
+            raise serializers.ValidationError("Provide up to 12 photo URLs.")
+        if not all(isinstance(image, str) and image.startswith(("http://", "https://")) for image in images):
+            raise serializers.ValidationError("Each photo must have an HTTP or HTTPS URL.")
+        return images

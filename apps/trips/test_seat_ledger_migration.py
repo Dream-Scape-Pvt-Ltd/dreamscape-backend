@@ -17,8 +17,12 @@ class SeatLedgerMigrationTests(TransactionTestCase):
     # These migrations create data the trip FK needs, so keep them applied.
     available_apps = None
 
-    migrate_from = [("trips", "0003_trip_gallery_images_trip_hero_image_url")]
-    migrate_to = [("trips", "0004_departure_seat_ledger")]
+    # Include the current destination branch in the historical app registry.
+    # This test only rolls the trips ledger back; destination CMS fields stay
+    # present in the database and must be present on its historical model too.
+    destination_target = ("destinations", "0004_merge_seed_regions_and_gallery")
+    migrate_from = [("trips", "0003_trip_gallery_images_trip_hero_image_url"), destination_target]
+    migrate_to = [("trips", "0004_departure_seat_ledger"), destination_target]
 
     def _migrate(self, targets):
         executor = MigrationExecutor(connection)

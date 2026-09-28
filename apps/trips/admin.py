@@ -8,10 +8,16 @@ from apps.trips.models import (
 )
 
 
-class ItineraryDayInline(admin.TabularInline):
+class ItineraryDayInline(admin.StackedInline):
     model = ItineraryDay
     extra = 1
-    fields = ("day_number", "title", "elevation_meters", "accommodation_type", "is_acclimatization_day")
+    fields = (
+        ("day_number", "title"),
+        "description",
+        ("overnight_stay", "elevation_meters"),
+        ("accommodation_type", "is_acclimatization_day"),
+        "meals_included",
+    )
     ordering = ("day_number",)
 
 

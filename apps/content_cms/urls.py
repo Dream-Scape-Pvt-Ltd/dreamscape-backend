@@ -1,13 +1,18 @@
-﻿"""
+from apps.content_cms.views.trek_guide_views import TrekGuideListCreateView, TrekGuideDetailView
+"""
 apps.content_cms URL configuration -- Phase 0 stub.
 Endpoints will be registered in their respective implementation phase.
 """
 from django.urls import path
+from apps.content_cms.views.site_settings_views import SiteSettingsView
 from apps.content_cms.views import GuideCommentDetailView, GuideCommentListCreateView, GuideImageUploadView, GuideViewCountView, TravelGuideListCreateView, TravelGuideDetailView, ResponsibleTravelListCreateView, ResponsibleTravelDetailView
 
 app_name = 'content_cms'
 
 urlpatterns = [
+    path('trek-guides/', TrekGuideListCreateView.as_view(), name='trek-guide-list'),
+    path('trek-guides/<slug:slug>/', TrekGuideDetailView.as_view(), name='trek-guide-detail'),
+    path('site-settings/', SiteSettingsView.as_view(), name='site-settings'),
     path('guides/', TravelGuideListCreateView.as_view(), name='guide-list'),
     path('guides/media/upload/', GuideImageUploadView.as_view(), name='guide-image-upload'),
     path('guides/<slug:slug>/view/', GuideViewCountView.as_view(), name='guide-view-count'),

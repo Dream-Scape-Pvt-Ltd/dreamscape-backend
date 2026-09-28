@@ -1,0 +1,107 @@
+{
+  "stories": [
+    {
+      "slug": "finding-your-own-pace",
+      "title": "The climb. The flags. The people.",
+      "summary": "A rocky path, a pause beneath the peaks, and the people who make the view a memory.",
+      "category": "ADVENTURE",
+      "country": "Nepal",
+      "hero_image_url": "/images/trek-memories/together-in-the-mountains.jpg",
+      "gallery_images": [
+        "/images/trek-memories/stone-path.jpg",
+        "/images/trek-memories/a-pause-on-the-ridge.jpg",
+        "/images/trek-memories/prayer-flags-and-friends.jpg",
+        "/images/trek-memories/high-trail.jpg"
+      ],
+      "markdown_content": "## The journey between the photographs\n\nThe camera catches a pause. Around it, the path keeps going: over uneven stones, around the hillside, into the next stretch of open sky. In these photographs from past treks, the people are often small against the landscape. Yet they are the part that makes each frame feel personal.\n\nA line of walkers on a stone path tells a different story from a mountain on its own. It gives the view a rhythm. One person steps ahead; another takes a moment to look back.\n\n## Room for a pause\n\nOn the hillside, a few walkers have stopped beneath a wide white skyline. There is no need for a dramatic pose. The space around them does the talking.\n\nSome pictures matter because they hold an ordinary part of a bigger day: sitting for a moment, setting down a bag, taking in the distance. Those small pauses belong in the story as much as the climb.\n\n## A photograph with your people\n\nUnder a web of prayer flags, the group gathers around a viewpoint marker. Walking clothes, sunglasses, backpacks and bright sky: the frame keeps the small details together.\n\nThe mountain gives this photograph its setting. The people give it something to return to. Long after a trek, a group picture can bring the whole day a little closer.\n\n## More than a point on a map\n\nThese images are memories of old treks, brought together from the Dreamscape collection. They leave space for the stories that do not fit into a caption.\n\nFor the next journey, the invitation is simple: bring your curiosity, make room for your own pace, and keep a few photographs of the people beside you."
+    },
+    {
+      "slug": "the-spaces-between-the-peaks",
+      "title": "The quieter half of the journey.",
+      "summary": "Forest paths, blue doorways and tiny flowers. The details that make a mountain journey feel lived in.",
+      "category": "ADVENTURE",
+      "country": "Nepal",
+      "hero_image_url": "/images/trek-memories/forest-footsteps.jpg",
+      "gallery_images": [
+        "/images/trek-memories/forest-light.jpg",
+        "/images/trek-memories/mountain-teahouse.jpg",
+        "/images/trek-memories/blue-doorway.jpg",
+        "/images/trek-memories/blue-flowers.jpg"
+      ],
+      "markdown_content": "## Before the wide-open view\n\nNot every trekking photograph needs a snow peak. Here, the path runs beneath trees. Backpacks bring little flashes of colour into the green, and sunlight finds its way through the canopy.\n\nThese quieter frames give the collection depth. They show a different texture of the journey: roots, stones, leaves and a trail that disappears around the next bend.\n\n## A place to stop\n\nA small building stands beside a rock face, with blue window frames and tables outside. It is the kind of scene that sits between the larger views in a photo collection.\n\nIts blue window frames and outdoor tables bring a human scale to the rock face behind it. The buildings along a trail become part of its character: places to look towards, pause beside, and remember.\n\n## Colour at the doorway\n\nTurquoise paint, weathered stone and handwritten signs fill another frame. The close view asks for a different kind of attention from the mountain panorama.\n\nA remembered journey is made from both. There is the view you expected to photograph, and there is the doorway you stopped beside because its colour caught your eye.\n\n## Leave space for small things\n\nBlue flowers grow close to the ground among dry leaves. Beside all the wide skies in this collection, their small scale feels like a pause.\n\nLook through your own photographs after a trip and these details often bring variety to the story. Keep them. A journey is more than its most spectacular frame."
+    },
+    {
+      "slug": "a-mountain-photo-journal",
+      "title": "When the mountains catch the light.",
+      "summary": "Clear blue skies, shadowed valleys and a pink-lit summit. A photo story about looking a little longer.",
+      "category": "ADVENTURE",
+      "country": "Nepal",
+      "hero_image_url": "/images/trek-memories/sunlit-summits.jpg",
+      "gallery_images": [
+        "/images/trek-memories/sunlit-summits.jpg",
+        "/images/trek-memories/valley-tree.jpg",
+        "/images/trek-memories/mountain-path.jpg",
+        "/images/trek-memories/last-light.jpg"
+      ],
+      "markdown_content": "## A skyline in two colours\n\nLight rests on the snow while the valley below stays in shadow. The photograph holds both at once: warm edges on the skyline and a deep blue landscape underneath.\n\nThere is no single way for the mountains to look. Across these older trek photographs, even the colour of the sky changes the feeling of a frame.\n\n## Give the view a foreground\n\nA tree stands above layers of mountain valleys. Its branches break up the open blue and draw the eye back towards the trail.\n\nA photograph does not need an unobstructed panorama to feel expansive. Sometimes the tree, the path or the rough edge of a hillside helps us understand how far the view goes.\n\n## A person in the landscape\n\nOn a hillside path, a walker sits within a much larger scene. The mountain rises behind them, bright against the blue.\n\nThat small human presence gives the frame scale. It also connects this collection to the act of travelling through a place, rather than simply looking at it from a distance.\n\n## The frame you return to\n\nIn one photograph, pink light touches the summit while the lower ridges darken. The sky has softened, and the last warm colour makes the mountain stand apart from everything below.\n\nSome views invite a longer look. Return to this frame after the forests, the village streets and the group photographs, and it becomes another part of the same collection: a small window into time spent in the mountains."
+    }
+  ],
+  "destinations": [
+    {
+      "slug": "everest",
+      "name": "Everest & Khumbu",
+      "country": "NEPAL",
+      "region_name": "Everest",
+      "headline": "In the company of giants.",
+      "description": "Follow stone paths through Sherpa villages, past prayer wheels and hillside monasteries. Above it all, Everest and Ama Dablam rise into an impossibly wide sky.",
+      "highlights": "Everest Base Camp · Gokyo · Cho La",
+      "trail_style": "High passes & Sherpa culture",
+      "pace": "A classic high-altitude journey",
+      "base": "Namche Bazaar",
+      "mood": "high-passes",
+      "hero_media": "/images/151-31-imgNepalHimalayanRangeWithAmaDablam.png"
+    },
+    {
+      "slug": "annapurna",
+      "name": "Annapurna & Mustang",
+      "country": "NEPAL",
+      "region_name": "Annapurna",
+      "headline": "Every valley, a different world.",
+      "description": "From green foothills to the high lakes of Annapurna and the ochre landscapes of Mustang, discover a region shaped by remarkable contrasts and living traditions.",
+      "highlights": "Tilicho Lake · Thorong La · Lo Manthang",
+      "trail_style": "Mountain trails & cultural journeys",
+      "pace": "From gentle foothills to high passes",
+      "base": "Pokhara",
+      "mood": "culture",
+      "hero_media": "/images/151-31-imgUpperMustangAndAnnapurnaHighAltitudeRealm.png"
+    },
+    {
+      "slug": "manaslu",
+      "name": "Manaslu & Tsum Valley",
+      "country": "NEPAL",
+      "region_name": "Manaslu",
+      "headline": "A little further from the familiar.",
+      "description": "Walk through forested river valleys and mountain settlements toward the open landscapes of Larkya La. In Tsum Valley, the journey slows around monasteries and village life.",
+      "highlights": "Larkya La · Samagaun · Tsum Valley",
+      "trail_style": "Remote circuits & valley life",
+      "pace": "Longer days, deeper immersion",
+      "base": "Samagaun",
+      "mood": "remote",
+      "hero_media": "/images/151-31-imgManasluAndTsumValleySanctuary.png"
+    },
+    {
+      "slug": "dolpo",
+      "name": "Dolpo & West Nepal",
+      "country": "NEPAL",
+      "region_name": "Dolpo",
+      "headline": "Room to feel wonderfully small.",
+      "description": "Venture into the open spaces of western Nepal. The blue waters of Phoksundo, old monasteries and far-reaching mountain trails reward a slower, more considered journey.",
+      "highlights": "Phoksundo · Shey Gompa · Saldang",
+      "trail_style": "Wilderness & remote heritage",
+      "pace": "An expedition with time to spare",
+      "base": "Dunai",
+      "mood": "remote",
+      "hero_media": "/images/151-31-imgDolpoAndSheyPhoksundoDeepWilderness.png"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import DepartureCapacityFilter
 from apps.trips.models import Trip, TripDeparture
+from apps.trips.lookup import trip_lookup
 from apps.trips.serializers import (
     DepartureCapacitySerializer,
     TripDepartureSerializer,
@@ -33,7 +34,7 @@ class DepartureListCreateView(generics.ListCreateAPIView):
 
     def get_trip(self):
         slug = self.kwargs.get("slug")
-        trip = Trip.objects.filter(slug=slug).first()
+        trip = Trip.objects.filter(**trip_lookup(slug)).first()
         if not trip:
             raise NotFound(detail=f"Trip with slug '{slug}' not found.")
         return trip

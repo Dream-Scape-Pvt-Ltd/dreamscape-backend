@@ -129,10 +129,10 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
                 TailorMadeRequest.objects.create(inquiry=inquiry, **tm_data)
 
             self._apply_assignment_rules(inquiry)
+            send_inquiry_acknowledgement_email(inquiry.id)
 
         # Trigger async tasks
         try:
-            send_inquiry_acknowledgement_email(inquiry.id)
             send_agent_whatsapp_alert(inquiry.id)
         except Exception:
             pass

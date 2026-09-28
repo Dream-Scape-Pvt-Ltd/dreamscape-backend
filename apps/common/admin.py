@@ -21,3 +21,18 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ("id", "actor", "action", "entity_type", "entity_id", "created_at")
     search_fields = ("action", "entity_type", "entity_id", "actor__email")
     list_filter = ("action", "entity_type", "created_at")
+
+
+from apps.common.models import TransactionalEmail
+
+@admin.register(TransactionalEmail)
+class TransactionalEmailAdmin(admin.ModelAdmin):
+    list_display = ('event_key','recipient','sent_at','attempts','needs_review','next_attempt_at')
+    list_filter = ('needs_review','sent_at')
+    readonly_fields = ('event_key','recipient','subject','body','sent_at','first_attempt_at','next_attempt_at','attempts','provider_message_id')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

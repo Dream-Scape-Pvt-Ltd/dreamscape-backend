@@ -214,6 +214,42 @@ class TripCatalogTests(APITestCase):
         self.assertIn("schema_org_json_ld", trip_data)
         self.assertEqual(trip_data["schema_org_json_ld"]["@type"], "TouristTrip")
 
+    def test_public_uuid_links_load_trip_and_departures(self):
+        for reference in (str(self.trip.id), self.trip.slug):
+            detail = self.client.get(reverse("trips:trip-detail", kwargs={"slug": reference}))
+            self.assertEqual(detail.status_code, status.HTTP_200_OK)
+            self.assertEqual(detail.json()["data"]["id"], str(self.trip.id))
+            dates = self.client.get(reverse("trips:departure-list", kwargs={"slug": reference}))
+            self.assertEqual(dates.status_code, status.HTTP_200_OK)
+            self.assertEqual(dates.json()["data"]["count"], 1)
+
+    def test_unknown_uuid_link_returns_not_found(self):
+        response = self.client.get(reverse("trips:trip-detail", kwargs={"slug": "00000000-0000-0000-0000-000000000000"}))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cms_altitude_edit_roundtrip_and_invalid_edit_preserves_itinerary(self):
+        self.client.force_authenticate(self.admin)
+        url = reverse("trips:trip-detail", kwargs={"slug": self.trip.slug})
+        days = [{"day_number": 1, "title": "Coastal start", "overnight_stay": "Sea level", "elevation_meters": 0},
+                {"day_number": 2, "title": "Route pending", "overnight_stay": "To be confirmed", "elevation_meters": None},
+                {"day_number": 3, "title": "Rest in Namche", "overnight_stay": "Namche Bazaar", "elevation_meters": 3440, "is_acclimatization_day": True}]
+        response = self.client.patch(url, {"itinerary_days": days}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual([day["elevation_meters"] for day in response.data["itinerary_days"]], [0, None, 3440])
+        self.client.force_authenticate(None)
+        saved = self.client.get(url).data["itinerary_days"]
+        self.assertEqual([day["elevation_meters"] for day in saved], [0, None, 3440])
+        self.assertTrue(saved[2]["is_acclimatization_day"])
+        self.assertEqual(saved[2]["overnight_stay"], "Namche Bazaar")
+        self.client.force_authenticate(self.admin)
+        for bad in [-1, 9000, "unknown"]:
+            rejected = self.client.patch(url, {"itinerary_days": [{**days[0], "elevation_meters": bad}]}, format="json")
+            self.assertEqual(rejected.status_code, 400)
+            self.assertEqual(self.trip.itinerary_days.count(), 3)
+        duplicate = self.client.patch(url, {"itinerary_days": [days[0], days[0]]}, format="json")
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(self.trip.itinerary_days.count(), 3)
+
     def test_itinerary_list_and_create(self):
         list_url = reverse("trips:trip-itinerary", kwargs={"slug": self.trip.slug})
 

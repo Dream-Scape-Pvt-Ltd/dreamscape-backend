@@ -64,7 +64,7 @@ class TravelGuideListSerializer(serializers.ModelSerializer):
             "country",
             "region",
             "hero_image_url",
-            "gallery_images",
+            "gallery_images", "summary",
             "is_published",
             "published_at",
             "updated_at",
@@ -104,7 +104,7 @@ class TravelGuideDetailSerializer(serializers.ModelSerializer):
             "category",
             "markdown_content",
             "hero_image_url",
-            "gallery_images",
+            "gallery_images", "summary",
             "meta_title",
             "meta_description",
             "canonical_url",
@@ -169,7 +169,7 @@ class TravelGuideWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = TravelGuide
         fields = ['id', 'destination', 'author', 'title', 'slug', 'country', 'region', 'category',
-                  'markdown_content', 'hero_image_url', 'gallery_images', 'meta_title', 'meta_description',
+                  'markdown_content', 'hero_image_url', 'gallery_images', 'summary', 'meta_title', 'meta_description',
                   'canonical_url', 'is_published', 'published_at']
         read_only_fields = ['id', 'author', 'published_at']
 

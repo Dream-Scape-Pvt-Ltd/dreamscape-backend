@@ -35,6 +35,12 @@ class ContentAPITests(PortalFixtures, APITestCase):
         self.assertEqual(self.client.get('/api/v1/content/guides/').data['count'], 2)
         self.assertEqual(self.client.get('/api/v1/content/guides/draft/').status_code, 200)
 
+    def test_article_uuid_links_resolve_and_drafts_remain_private(self):
+        response = self.client.get(f"/api/v1/content/guides/{self.guide.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["slug"], self.guide.slug)
+        self.assertEqual(self.client.get(f"/api/v1/content/guides/{self.draft.pk}/").status_code, 404)
+
     def test_article_breadcrumb_and_no_author_email(self):
         response = self.client.get('/api/v1/content/guides/everest-permits/')
         self.assertEqual(response.status_code, 200)

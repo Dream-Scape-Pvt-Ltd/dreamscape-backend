@@ -87,12 +87,20 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': env.db(
-        'DATABASE_URL',
-        default=f"postgres://{env('DB_USER', default='postgres')}:{env('DB_PASSWORD', default='')}@{env('DB_HOST', default='localhost')}:{env('DB_PORT', default='5432')}/{env('DB_NAME', default='dreamscape_db')}"
-    )
-}
+if env.bool('USE_SQLITE', default=False):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': env.db(
+            'DATABASE_URL',
+            default=f"postgres://{env('DB_USER', default='postgres')}:{env('DB_PASSWORD', default='')}@{env('DB_HOST', default='localhost')}:{env('DB_PORT', default='5432')}/{env('DB_NAME', default='dreamscape_db')}"
+        )
+    }
 
 
 # Password validation
@@ -264,6 +272,7 @@ CRM_SLA_HOURS = env.int('CRM_SLA_HOURS', default=4)
 WAITLIST_OFFER_TTL_HOURS = env.int('WAITLIST_OFFER_TTL_HOURS', default=48)
 
 CELERY_BEAT_SCHEDULE = {
+    'deliver-transactional-email-outbox': {'task': 'apps.common.email_tasks.dispatch_pending_emails', 'schedule': 30.0},
     'deliver-partner-email-outbox': {
         'task': 'apps.b2b.tasks.dispatch_pending_partner_emails',
         'schedule': 5.0,

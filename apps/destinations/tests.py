@@ -105,6 +105,24 @@ class DestinationTests(APITestCase):
         res = response.json()
         self.assertEqual(res["data"]["region_name"], "Solukhumbu High Himalaya")
 
+    def test_gallery_can_be_edited_and_seen_on_public_destination(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("destinations:destination-detail", kwargs={"slug": self.destination.slug})
+        photos = [
+            "https://images.dreamscapetreks.com/everest-1.webp",
+            "https://images.dreamscapetreks.com/everest-2.webp",
+        ]
+        response = self.client.patch(url, {"gallery_images": photos}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.client.force_authenticate(user=None)
+        self.assertEqual(self.client.get(url).json()["data"]["gallery_images"], photos)
+
+    def test_gallery_rejects_invalid_photo_urls(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("destinations:destination-detail", kwargs={"slug": self.destination.slug})
+        response = self.client.patch(url, {"gallery_images": ["javascript:alert(1)"]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_list_and_create_categories(self):
         # Public GET
         list_url = reverse("destinations:category-list")

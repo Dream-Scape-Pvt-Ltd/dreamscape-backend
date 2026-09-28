@@ -9,13 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 def send_inquiry_acknowledgement_email(inquiry_id):
-    """
-    Sends automated acknowledgement email to the client confirming receipt of inquiry:
-    "We have received your journey inquiry; our team is reviewing your requirements..."
-    Offloaded to Celery worker in production.
-    """
-    logger.info(f"Sending inquiry acknowledgement email for inquiry ID: {inquiry_id}")
-    return True
+    from apps.inquiries.models import Inquiry
+    from apps.common.email_tasks import queue_email
+    inquiry = Inquiry.objects.get(pk=inquiry_id)
+    return queue_email(
+        f'inquiry-ack/{inquiry.pk}', inquiry.email,
+        f'Dreamscape enquiry received — {inquiry.inquiry_number}',
+        f'Hello {inquiry.full_name},\n\nWe have received your enquiry. Our team will review your requirements and contact you.\n\nReference: {inquiry.inquiry_number}\nThis acknowledges your enquiry; it does not confirm a reservation.\n\nDreamscape Treks',
+    )
 
 
 def send_agent_whatsapp_alert(inquiry_id):

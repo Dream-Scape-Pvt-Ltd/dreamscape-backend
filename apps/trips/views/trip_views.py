@@ -1,5 +1,7 @@
 from django.db import transaction
-from django.db.models import Avg, Count, Q
+from django.shortcuts import get_object_or_404
+from django.db.models import Avg, Count, Q, Prefetch
+from apps.content_cms.models import TrekGuide
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import generics, status
@@ -13,6 +15,8 @@ from apps.common.models import MediaAsset
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import TripFilter
 from apps.trips.models import Trip, ItineraryDay
+from apps.trips.serializers.itinerary_serializers import validated_itinerary
+from apps.trips.lookup import trip_lookup
 from apps.trips.serializers import (
     TripDetailSerializer,
     TripListSerializer,
@@ -119,7 +123,7 @@ class TripListCreateView(generics.ListCreateAPIView):
         },
     )
     def post(self, request, *args, **kwargs):
-        itinerary_data = request.data.get("itinerary_days", None)
+        itinerary_data = validated_itinerary(request.data)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
@@ -146,6 +150,7 @@ class TripListCreateView(generics.ListCreateAPIView):
                     )
                 if new_days:
                     ItineraryDay.objects.bulk_create(new_days)
+                getattr(trip, "_prefetched_objects_cache", {}).pop("itinerary_days", None)
         output_serializer = TripDetailSerializer(trip)
         response = Response(output_serializer.data, status=status.HTTP_201_CREATED)
         response.success_message = "Trip created successfully."
@@ -161,6 +166,11 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     lookup_field = "slug"
 
+    def get_object(self):
+        obj = get_object_or_404(self.get_queryset(), **trip_lookup(self.kwargs["slug"]))
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def get_permissions(self):
         if self.request.method in ["PATCH", "PUT", "DELETE"]:
             return [IsAdminRole()]
@@ -174,7 +184,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Trip.objects.select_related(
             "destination", "category", "expedition_detail"
-        ).prefetch_related("itinerary_days", "departures", "reviews")
+        ).prefetch_related("itinerary_days", "departures", "reviews", Prefetch("guides", queryset=TrekGuide.objects.filter(is_published=True), to_attr="published_guides"))
 
     @extend_schema(
         tags=["Trips"],
@@ -200,7 +210,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def patch(self, request, *args, **kwargs):
         instance = self.get_object()
-        itinerary_data = request.data.get("itinerary_days", None)
+        itinerary_data = validated_itinerary(request.data)
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
@@ -228,6 +238,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
                     )
                 if new_days:
                     ItineraryDay.objects.bulk_create(new_days)
+                getattr(trip, "_prefetched_objects_cache", {}).pop("itinerary_days", None)
         output_serializer = TripDetailSerializer(trip)
         response = Response(output_serializer.data, status=status.HTTP_200_OK)
         response.success_message = "Trip updated successfully."

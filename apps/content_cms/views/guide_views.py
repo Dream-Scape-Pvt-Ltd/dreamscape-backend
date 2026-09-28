@@ -1,3 +1,4 @@
+from apps.trips.lookup import trip_lookup
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -50,6 +51,11 @@ class TravelGuideListCreateView(GuideQuerysetMixin, generics.ListCreateAPIView):
 class TravelGuideDetailView(GuideQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'slug'
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
+
+    def get_object(self):
+        obj = generics.get_object_or_404(self.get_queryset(), **trip_lookup(self.kwargs['slug']))
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def get_serializer_class(self):
         return TravelGuideWriteSerializer if self.request.method == 'PATCH' else TravelGuideDetailSerializer
