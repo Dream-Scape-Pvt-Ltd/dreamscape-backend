@@ -33,7 +33,19 @@ def validate_company(value):
     if 'intro' in clean and not clean['intro']:
         raise serializers.ValidationError('Add at least one introduction paragraph.')
     if 'team_profiles' in value:
-        clean['team_profiles'] = records(value['team_profiles'], {'name':text,'role':text,'paragraphs':strings})
+        profiles = value['team_profiles']
+        if not isinstance(profiles, list) or len(profiles) > 30:
+            raise serializers.ValidationError('Too many team profiles.')
+        clean['team_profiles'] = []
+        for profile in profiles:
+            if not isinstance(profile, dict) or set(profile) - {'name','role','paragraphs','image'} or not {'name','role','paragraphs'} <= set(profile):
+                raise serializers.ValidationError('Each team profile needs a name, role and biography.')
+            clean['team_profiles'].append({
+                'name': text(profile['name'], 180),
+                'role': text(profile['role'], 180),
+                'paragraphs': strings(profile['paragraphs']),
+                'image': image(profile['image']) if profile.get('image') else '',
+            })
     for key in ['principles','responsibilities']:
         if key in value:
             clean[key] = records(value[key], {'title':text,'paragraphs':strings})

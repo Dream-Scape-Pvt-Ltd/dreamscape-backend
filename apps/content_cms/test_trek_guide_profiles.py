@@ -3,15 +3,23 @@ from apps.common.testing import PortalFixtures
 from apps.content_cms.models import TrekGuide
 
 class TrekGuideProfileTests(PortalFixtures,APITestCase):
+    def test_santa_is_published_as_a_guide_with_an_editable_photo_slot(self):
+        santa=TrekGuide.objects.get(slug='santa-bahadur-tama')
+        self.assertEqual(santa.role,'Trekking Guide')
+        self.assertEqual(santa.photo_url,'')
+        self.assertTrue(santa.is_published)
+        self.assertIn('Santa Bahadur Tama',santa.bio)
+
     def test_draft_stays_private_and_public_uuid_and_slug_work(self):
         url='/api/v1/content/trek-guides/'
+        published_before=self.client.get(url).data['count']
         self.assertIn(self.client.post(url,{'name':'Actual guide','slug':'actual-guide'},format='json').status_code,[401,403])
         self.client.force_authenticate(self.admin)
         response=self.client.post(url,{'name':'Actual guide','slug':'actual-guide','bio':'Approved biography','languages':['Nepali'],'regions':[self.destination.slug],'treks_led':[self.trip.slug]},format='json')
         self.assertEqual(response.status_code,201)
         guide_id=response.data['id']
         self.client.force_authenticate(None)
-        self.assertEqual(self.client.get(url).data['count'],0)
+        self.assertEqual(self.client.get(url).data['count'],published_before)
         self.assertEqual(self.client.get(f"/api/v1/trips/{self.trip.slug}/").data["trek_guides"],[])
         self.assertEqual(self.client.get(url+str(guide_id)+'/').status_code,404)
         self.client.force_authenticate(self.admin)

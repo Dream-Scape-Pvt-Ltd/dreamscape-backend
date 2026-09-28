@@ -47,10 +47,12 @@ class SiteSettingsTests(PortalFixtures, APITestCase):
     def test_company_partner_gallery_edits_validate_and_preserve_other_sections(self):
         self.client.force_authenticate(self.admin)
         url='/api/v1/content/site-settings/'
-        response=self.client.patch(url,{'home_title':'Your horizon','company_content':{'intro':['Our approved story'],'team_profiles':[{'name':'Guide','role':'Team','paragraphs':['Biography']}]},'partner_content':{'title':'Partner with us'},'gallery_images':[{'image':'/images/trek.jpg','title':'Nepal','group':'Mountains'}]},format='json')
+        response=self.client.patch(url,{'home_title':'Your horizon','company_content':{'intro':['Our approved story'],'team_profiles':[{'name':'Guide','role':'Team','image':'/images/team/guide.png','paragraphs':['Biography']}]},'partner_content':{'title':'Partner with us'},'gallery_images':[{'image':'/images/trek.jpg','title':'Nepal','group':'Mountains'}]},format='json')
         self.assertEqual(response.status_code,200)
         self.client.patch(url,{'company_content':{'intro':['Updated story']}},format='json')
         self.assertEqual(self.client.get(url).data['company_content']['team_profiles'][0]['name'],'Guide')
+        self.assertEqual(self.client.get(url).data['company_content']['team_profiles'][0]['image'],'/images/team/guide.png')
+        self.assertEqual(self.client.patch(url,{'company_content':{'team_profiles':[{'name':'Guide','role':'Team','image':'javascript:alert(1)','paragraphs':['Biography']}]}},format='json').status_code,400)
         self.assertEqual(self.client.patch(url,{'gallery_images':[{'image':'javascript:alert(1)','title':'Bad','group':'Mountains'}]},format='json').status_code,400)
         self.assertEqual(self.client.patch(url,{'company_content':{'intro':[]}},format='json').status_code,400)
         self.assertEqual(self.client.patch(url,{'gallery_images':[]},format='json').status_code,200)
