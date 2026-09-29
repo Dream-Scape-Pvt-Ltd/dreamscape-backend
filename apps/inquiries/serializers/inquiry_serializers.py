@@ -10,7 +10,9 @@ from apps.inquiries.models import (
     InquiryType,
     InquiryStatus,
     LostReason,
+    PrivateParty,
     TailorMadeRequest,
+    TripStyle,
 )
 from apps.inquiries.serializers.activity_serializers import ActivitySerializer
 from apps.inquiries.serializers.tag_serializers import TagSerializer
@@ -88,6 +90,11 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
             "preferred_dates",
             "estimated_budget",
             "group_size",
+            "trip_style",
+            "private_party",
+            "children_ages",
+            "comfort_level",
+            "support_level",
             "lead_source",
             "tailor_made",
         ]
@@ -99,6 +106,19 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
             data = data.copy() if hasattr(data, "copy") else dict(data)
             data["tailor_made"] = data.get("tailor_made_detail")
         return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        # Keep the optional trip preferences consistent with the chosen style.
+        style = attrs.get("trip_style", "")
+        party = attrs.get("private_party", "") if style == TripStyle.PRIVATE else ""
+        attrs["private_party"] = party
+        if style != TripStyle.FAMILY_KIDS and party != PrivateParty.FAMILY:
+            attrs["children_ages"] = ""
+        if party == PrivateParty.SOLO:
+            attrs["group_size"] = 1
+        elif style == TripStyle.COUPLE and not attrs.get("group_size"):
+            attrs["group_size"] = 2
+        return attrs
 
     def create(self, validated_data):
         tailor_made_data = validated_data.pop("tailor_made", None)
@@ -170,6 +190,7 @@ class InquiryListSerializer(serializers.ModelSerializer):
             "tags",
             "sla_breached",
             "group_size",
+            "trip_style",
             "travelers_count",
             "revenue_usd",
             "created_at",
@@ -224,6 +245,11 @@ class InquiryDetailSerializer(serializers.ModelSerializer):
             "preferred_dates",
             "estimated_budget",
             "group_size",
+            "trip_style",
+            "private_party",
+            "children_ages",
+            "comfort_level",
+            "support_level",
             "lead_source",
             "status",
             "lost_reason",

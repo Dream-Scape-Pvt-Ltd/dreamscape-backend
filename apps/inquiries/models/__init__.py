@@ -1,4 +1,14 @@
-from .inquiry import Inquiry, InquiryType, InquiryStatus, LostReason, SEAT_HOLDING_STATUSES
+from .inquiry import (
+    Inquiry,
+    InquiryType,
+    InquiryStatus,
+    LostReason,
+    SEAT_HOLDING_STATUSES,
+    TripStyle,
+    PrivateParty,
+    ComfortLevel,
+    SupportLevel,
+)
 from .tailor_made import TailorMadeRequest
 from .note import InquiryNote
 from .customer import Customer
@@ -14,6 +24,10 @@ __all__ = [
     "InquiryStatus",
     "LostReason",
     "SEAT_HOLDING_STATUSES",
+    "TripStyle",
+    "PrivateParty",
+    "ComfortLevel",
+    "SupportLevel",
     "TailorMadeRequest",
     "InquiryNote",
     "Customer",

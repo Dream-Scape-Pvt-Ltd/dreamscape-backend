@@ -179,6 +179,58 @@ class InquiryAPITests(APITestCase):
         self.assertIsNotNone(data["departure"])
         self.assertEqual(data["departure"]["price_usd"], "1800.00")
 
+    def test_trip_preferences_are_saved(self):
+        """Plan-my-trip preferences are stored on the inquiry."""
+        url = reverse("inquiries:inquiry-list-create")
+        payload = {
+            "inquiry_type": InquiryType.JOURNEY,
+            "trip": str(self.trip.id),
+            "full_name": "Asha Rai",
+            "email": "asha@example.com",
+            "message": "Private family trek please.",
+            "group_size": 4,
+            "trip_style": "PRIVATE",
+            "private_party": "FAMILY",
+            "children_ages": "7, 10",
+            "comfort_level": "PREMIUM",
+            "support_level": "GUIDE_PORTER",
+        }
+
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        inquiry = Inquiry.objects.get(inquiry_number=response.json()["data"]["inquiry_number"])
+        self.assertEqual(inquiry.trip_style, "PRIVATE")
+        self.assertEqual(inquiry.private_party, "FAMILY")
+        self.assertEqual(inquiry.children_ages, "7, 10")
+        self.assertEqual(inquiry.comfort_level, "PREMIUM")
+        self.assertEqual(inquiry.support_level, "GUIDE_PORTER")
+        self.assertEqual(inquiry.group_size, 4)
+
+    def test_trip_preferences_are_kept_consistent(self):
+        """Party and children's ages are dropped when they do not fit the style; solo means one traveller."""
+        url = reverse("inquiries:inquiry-list-create")
+        base = {"inquiry_type": InquiryType.GENERAL, "full_name": "Sam", "email": "sam@example.com", "message": "Hi"}
+
+        response = self.client.post(url, {**base, "trip_style": "FRIENDS", "private_party": "FAMILY", "children_ages": "5"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        inquiry = Inquiry.objects.get(inquiry_number=response.json()["data"]["inquiry_number"])
+        self.assertEqual(inquiry.private_party, "")
+        self.assertEqual(inquiry.children_ages, "")
+
+        response = self.client.post(url, {**base, "trip_style": "PRIVATE", "private_party": "SOLO", "group_size": 6}, format="json")
+        inquiry = Inquiry.objects.get(inquiry_number=response.json()["data"]["inquiry_number"])
+        self.assertEqual(inquiry.group_size, 1)
+
+        response = self.client.post(url, {**base, "trip_style": "COUPLE"}, format="json")
+        inquiry = Inquiry.objects.get(inquiry_number=response.json()["data"]["inquiry_number"])
+        self.assertEqual(inquiry.group_size, 2)
+
+    def test_invalid_trip_style_rejected(self):
+        url = reverse("inquiries:inquiry-list-create")
+        payload = {"inquiry_type": InquiryType.GENERAL, "full_name": "Sam", "email": "sam@example.com", "message": "Hi", "trip_style": "SPACE"}
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_rbac_inquiry_list_forbidden_for_customers(self):
         """Customers and anonymous users cannot view CRM inquiries (401/403)."""
         url = reverse("inquiries:inquiry-list-create")

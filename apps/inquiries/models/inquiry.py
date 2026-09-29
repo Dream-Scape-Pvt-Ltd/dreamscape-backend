@@ -39,6 +39,34 @@ class LostReason(models.TextChoices):
     OTHER = "OTHER", "Other"
 
 
+class TripStyle(models.TextChoices):
+    PRIVATE = "PRIVATE", "Private Tour"
+    COUPLE = "COUPLE", "Couple / Honeymoon"
+    GROUP_DEPARTURE = "GROUP_DEPARTURE", "Join a Group Departure"
+    FRIENDS = "FRIENDS", "Friends Group"
+    FAMILY_KIDS = "FAMILY_KIDS", "Family with Kids"
+    CORPORATE_SCHOOL = "CORPORATE_SCHOOL", "Corporate / School Group"
+    RELAXED_PACE = "RELAXED_PACE", "Relaxed / Senior Pace"
+
+
+class PrivateParty(models.TextChoices):
+    SOLO = "SOLO", "Solo"
+    FAMILY = "FAMILY", "Family"
+    GROUP = "GROUP", "Group"
+
+
+class ComfortLevel(models.TextChoices):
+    BUDGET = "BUDGET", "Budget"
+    STANDARD = "STANDARD", "Standard"
+    PREMIUM = "PREMIUM", "Premium"
+
+
+class SupportLevel(models.TextChoices):
+    GUIDE_ONLY = "GUIDE_ONLY", "Guide Only"
+    GUIDE_PORTER = "GUIDE_PORTER", "Guide + Porter"
+    FULLY_SUPPORTED = "FULLY_SUPPORTED", "Fully Supported"
+
+
 class Inquiry(TimeStampedModel):
     """
     Inbound CRM lead, trip inquiry, or tailor-made custom adventure request.
@@ -88,6 +116,12 @@ class Inquiry(TimeStampedModel):
         blank=True,
     )
     group_size = models.PositiveIntegerField(null=True, blank=True)
+    # Optional trip preferences from the "Plan my trip" form.
+    trip_style = models.CharField(max_length=20, choices=TripStyle.choices, blank=True, db_index=True)
+    private_party = models.CharField(max_length=10, choices=PrivateParty.choices, blank=True)
+    children_ages = models.CharField(max_length=100, blank=True)
+    comfort_level = models.CharField(max_length=10, choices=ComfortLevel.choices, blank=True)
+    support_level = models.CharField(max_length=20, choices=SupportLevel.choices, blank=True)
     lead_source = models.CharField(max_length=50, default="WEBSITE")
     status = models.CharField(
         max_length=20,

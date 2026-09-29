@@ -4,7 +4,7 @@ import django_filters
 from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
-from apps.inquiries.models import Inquiry, InquiryStatus, InquiryType
+from apps.inquiries.models import Inquiry, InquiryStatus, InquiryType, TripStyle
 
 
 class InquiryFilter(django_filters.FilterSet):
@@ -23,6 +23,7 @@ class InquiryFilter(django_filters.FilterSet):
     )
     status = django_filters.ChoiceFilter(choices=InquiryStatus.choices)
     inquiry_type = django_filters.ChoiceFilter(choices=InquiryType.choices)
+    trip_style = django_filters.ChoiceFilter(choices=TripStyle.choices)
     assigned_agent = django_filters.CharFilter(method="filter_by_agent")
     lead_source = django_filters.CharFilter(lookup_expr="iexact")
     sla_breached = django_filters.BooleanFilter()
@@ -45,6 +46,7 @@ class InquiryFilter(django_filters.FilterSet):
             "destination",
             "status",
             "inquiry_type",
+            "trip_style",
             "assigned_agent",
             "lead_source",
             "sla_breached",

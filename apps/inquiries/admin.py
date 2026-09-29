@@ -58,7 +58,7 @@ class InquiryAdmin(admin.ModelAdmin):
         "sla_breached",
         "created_at",
     )
-    list_filter = ("status", "inquiry_type", "lead_source", "sla_breached", "tags", "created_at")
+    list_filter = ("status", "inquiry_type", "trip_style", "lead_source", "sla_breached", "tags", "created_at")
     search_fields = ("inquiry_number", "full_name", "email", "phone")
     readonly_fields = ("inquiry_number", "created_at", "updated_at")
     autocomplete_fields = ("customer", "converted_booking")
