@@ -73,7 +73,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.common.throttling.InternalRequestMiddleware',
 ]
+
+# Shared secret the Next.js server sends as X-Internal-Token (see apps/common/throttling.py).
+INTERNAL_API_TOKEN = env('INTERNAL_API_TOKEN', default='')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -151,6 +155,30 @@ SERVE_MEDIA = env.bool('SERVE_MEDIA', default=False)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Backblaze B2 (S3-compatible) for uploaded media. The bucket is private, so
+# file URLs are signed and expire after B2_URL_EXPIRE seconds.
+USE_B2 = env.bool('USE_B2', default=False)
+B2_URL_EXPIRE = env.int('B2_URL_EXPIRE', default=3600)
+# Public origin of this backend; stored image URLs are MEDIA_PUBLIC_BASE_URL + /media/<key>.
+MEDIA_PUBLIC_BASE_URL = env('MEDIA_PUBLIC_BASE_URL', default='http://127.0.0.1:8000').rstrip('/')
+if USE_B2:
+    B2_ENDPOINT = env('B2_ENDPOINT', default='s3.eu-central-003.backblazeb2.com')
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'access_key': env('B2_KEY_ID'),
+            'secret_key': env('B2_APPLICATION_KEY'),
+            'bucket_name': env('B2_BUCKET_NAME', default='dreamscape-trek-images'),
+            'endpoint_url': f'https://{B2_ENDPOINT}',
+            'region_name': env('B2_REGION', default='eu-central-003'),
+            'signature_version': 's3v4',
+            'default_acl': None,
+            'file_overwrite': False,
+            'querystring_auth': True,
+            'querystring_expire': B2_URL_EXPIRE,
+        },
+    }
+
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -175,9 +203,11 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
     # Throttling
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+        'apps.common.throttling.DreamscapeAnonThrottle',
+        'apps.common.throttling.DreamscapeUserThrottle',
     ],
+    # Render's proxy appends the caller's IP to X-Forwarded-For; trust only that last hop.
+    'NUM_PROXIES': env.int('NUM_PROXIES', default=0) or None,
     'DEFAULT_THROTTLE_RATES': {
         'anon': '200/day',
         'user': '2000/day',

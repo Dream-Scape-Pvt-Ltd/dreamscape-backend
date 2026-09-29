@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.lookups import SlugOrIdLookupMixin
+from apps.common.media import media_url
 from apps.common.models import MediaAsset
 from apps.common.permissions import IsAdminRole
 from apps.trips.filters import TripFilter
@@ -57,7 +58,7 @@ class TripImageUploadView(APIView):
             uploaded.append(
                 {
                     "id": str(asset.id),
-                    "url": request.build_absolute_uri(asset.file.url),
+                    "url": media_url(request, asset.file.name),
                     "name": asset.original_name,
                     "size": asset.file_size_bytes,
                 }

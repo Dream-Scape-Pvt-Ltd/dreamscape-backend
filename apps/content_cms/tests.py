@@ -8,7 +8,7 @@ from PIL import Image
 from rest_framework.test import APITestCase
 from apps.common.testing import PortalFixtures
 from apps.common.models import MediaAsset
-from apps.content_cms.models import BlogComment, TravelGuide, ResponsibleTravelInitiative, TrekGuide
+from apps.content_cms.models import BlogComment, SiteSettings, TravelGuide, ResponsibleTravelInitiative, TrekGuide
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -253,3 +253,40 @@ class TrekGuideAPITests(PortalFixtures, APITestCase):
         response = self.client.get(f'/api/v1/trips/{self.trip.slug}/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual([g['slug'] for g in response.data['trek_guides']], ['santa-bahadur-tamang'])
+
+
+class SiteSettingsAPITests(PortalFixtures, APITestCase):
+    url = '/api/v1/content/site-settings/'
+
+    def test_public_read_is_empty_until_saved_and_never_shows_crm_hours(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['data'], {})
+        SiteSettings.objects.create(content={'home_title': 'Walk higher'}, crm_sla_hours=6)
+        data = self.client.get(self.url).json()['data']
+        self.assertEqual(data, {'home_title': 'Walk higher'})
+
+    def test_admin_saves_content_and_response_time(self):
+        self.client.force_authenticate(self.admin)
+        payload = {'home_title': 'Walk higher', 'nav_company_items': [{'label': 'About Us', 'description': 'Our story', 'href': '/about'}], 'crm_sla_hours': 6}
+        response = self.client.patch(self.url, payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['data']['crm_sla_hours'], 6)
+        row = SiteSettings.load()
+        self.assertEqual((row.content['home_title'], row.crm_sla_hours), ('Walk higher', 6))
+        self.assertNotIn('crm_sla_hours', row.content)
+        # The editor always sends the whole object, so a save replaces the content.
+        self.client.patch(self.url, {'home_title': 'Beyond the horizon'}, format='json')
+        row.refresh_from_db()
+        self.assertEqual((row.content, row.crm_sla_hours), ({'home_title': 'Beyond the horizon'}, 6))
+
+    def test_invalid_response_time_and_non_object_bodies_are_rejected(self):
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.patch(self.url, {'crm_sla_hours': 0}, format='json').status_code, 400)
+        self.assertEqual(self.client.patch(self.url, {'crm_sla_hours': '4'}, format='json').status_code, 400)
+        self.assertEqual(self.client.patch(self.url, ['not', 'an', 'object'], format='json').status_code, 400)
+
+    def test_customers_cannot_change_settings(self):
+        self.client.force_authenticate(self.customer)
+        self.assertEqual(self.client.patch(self.url, {'home_title': 'Hijacked'}, format='json').status_code, 403)
+        self.assertFalse(SiteSettings.objects.exists())

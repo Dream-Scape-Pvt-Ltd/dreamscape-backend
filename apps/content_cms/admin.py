@@ -1,5 +1,16 @@
 from django.contrib import admin
-from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative, TrekGuide
+from apps.content_cms.models import SiteSettings, TravelGuide, ResponsibleTravelInitiative, TrekGuide
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "crm_sla_hours", "updated_at")
+
+    def has_add_permission(self, request):
+        return not SiteSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TravelGuide)

@@ -40,6 +40,7 @@ class TripListSerializer(serializers.ModelSerializer):
     destination_id = serializers.UUIDField(source="destination.id", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_slug = serializers.CharField(source="category.slug", read_only=True)
+    category_menu = serializers.CharField(source="category.menu.slug", read_only=True, default=None)
     rating_avg = serializers.SerializerMethodField()
     reviews_count = serializers.SerializerMethodField()
 
@@ -54,6 +55,7 @@ class TripListSerializer(serializers.ModelSerializer):
             "destination_id",
             "category_name",
             "category_slug",
+            "category_menu",
             "duration_days",
             "starting_price_usd",
             "altitude_max_meters",

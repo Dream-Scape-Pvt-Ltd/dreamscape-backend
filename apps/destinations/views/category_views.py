@@ -3,6 +3,7 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.common.exceptions import _build_error_envelope
 from apps.common.permissions import IsAdminRole
 from apps.destinations.models import ActivityCategory
 from apps.destinations.serializers import ActivityCategorySerializer
@@ -22,9 +23,13 @@ class ActivityCategoryListCreateView(generics.ListCreateAPIView):
         return [AllowAny()]
 
     def get_queryset(self):
-        if self.request.user.is_authenticated and getattr(self.request.user, "role", None) == "ADMIN":
-            return ActivityCategory.objects.all().order_by("name")
-        return ActivityCategory.objects.filter(is_active=True).order_by("name")
+        queryset = ActivityCategory.objects.all()
+        if not (self.request.user.is_authenticated and getattr(self.request.user, "role", None) == "ADMIN"):
+            queryset = queryset.filter(is_active=True)
+        menu = self.request.query_params.get("menu")
+        if menu is not None:
+            queryset = queryset.filter(menu__slug=menu)
+        return queryset
 
     @extend_schema(
         tags=["Categories"],
@@ -98,10 +103,21 @@ class ActivityCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         responses={
             204: OpenApiResponse(description="Category deleted successfully."),
             403: OpenApiResponse(description="Forbidden: Admin role required."),
+            409: OpenApiResponse(description="Category is still assigned to treks."),
         },
     )
     def delete(self, request, *args, **kwargs):
         instance = self.get_object()
+        in_use = instance.trips.count()
+        if in_use:
+            return Response(
+                _build_error_envelope(
+                    code="CATEGORY_IN_USE",
+                    message=f"{in_use} trek{'s are' if in_use != 1 else ' is'} still in this category. Move them to another category, or hide it instead.",
+                    details=None,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
         self.perform_destroy(instance)
         response = Response(status=status.HTTP_204_NO_CONTENT)
         response.success_message = "Activity category deleted successfully."

@@ -45,17 +45,25 @@ def send_sla_breach_alert(inquiry_id):
     return True
 
 
+def crm_sla_hours():
+    """Hours set in admin → Settings, or the CRM_SLA_HOURS server setting when none is set."""
+    from apps.content_cms.models import SiteSettings
+
+    configured = SiteSettings.objects.values_list("crm_sla_hours", flat=True).first()
+    return configured or getattr(settings, "CRM_SLA_HOURS", 4)
+
+
 @shared_task
 def check_sla_breaches():
     """
-    Celery Beat job (every 30 min): flags any NEW inquiry older than
-    settings.CRM_SLA_HOURS (default 4 business hours) that hasn't been
+    Celery Beat job (every 30 min): flags any NEW inquiry older than the
+    configured response time (crm_sla_hours(), in clock hours) that hasn't been
     responded to yet, and fires a manager notification for each newly
     flagged lead.
     """
     from apps.inquiries.models import Inquiry, InquiryStatus
 
-    sla_hours = getattr(settings, "CRM_SLA_HOURS", 4)
+    sla_hours = crm_sla_hours()
     threshold = timezone.now() - timedelta(hours=sla_hours)
 
     stale_leads = Inquiry.objects.filter(

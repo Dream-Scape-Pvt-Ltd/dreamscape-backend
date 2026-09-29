@@ -94,6 +94,16 @@ class SLABreachSweepTests(CRMJobTestBase):
         self.make_lead(age_hours=5)
         self.assertEqual(crm_tasks.check_sla_breaches(), 0)
 
+    @override_settings(CRM_SLA_HOURS=24)
+    @mock.patch.object(crm_tasks, "send_sla_breach_alert")
+    def test_hours_set_in_admin_settings_win_over_the_server_setting(self, alert):
+        from apps.content_cms.models import SiteSettings
+        row = SiteSettings.load()
+        row.crm_sla_hours = 2
+        row.save()
+        self.make_lead(age_hours=3)
+        self.assertEqual(crm_tasks.check_sla_breaches(), 1)
+
 
 class TaskReminderSweepTests(CRMJobTestBase):
     @mock.patch.object(crm_tasks, "send_task_reminder_alert")

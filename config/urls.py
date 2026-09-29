@@ -81,7 +81,11 @@ if settings.DEBUG:
         path("api/v1/_test/validation/", TestValidationView.as_view(), name="test-validation"),
     ]
 
-if settings.DEBUG or settings.SERVE_MEDIA:
+if settings.USE_B2:
+    from django.urls import re_path
+    from apps.common.media import media_redirect
+    urlpatterns += [re_path(r'^media/(?P<path>.+)$', media_redirect, name='media-redirect')]
+elif settings.DEBUG or settings.SERVE_MEDIA:
     from django.urls import re_path
     from django.views.static import serve
     urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})]
