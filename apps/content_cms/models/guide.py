@@ -42,6 +42,7 @@ class TravelGuide(TimeStampedModel):
         db_index=True,
     )
     markdown_content = models.TextField()
+    summary = models.CharField(max_length=500, blank=True)
     hero_image_url = models.URLField(max_length=500, blank=True)
     gallery_images = models.JSONField(default=list, blank=True)
     meta_title = models.CharField(max_length=255, blank=True)

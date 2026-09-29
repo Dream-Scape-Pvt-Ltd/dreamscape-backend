@@ -1,5 +1,17 @@
 from django.contrib import admin
-from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative
+from apps.content_cms.models import TravelGuide, ResponsibleTravelInitiative, SiteSettings
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'area', 'city', 'updated_at')
+    fieldsets = [('Homepage photograph', {'fields': ('home_image_url', 'home_image_alt')}), ('Office and map', {'fields': ('city', 'area', 'address', 'map_query', 'map_zoom', 'directions_note')}), ('Journal', {'fields': ('journal_title', 'journal_description', 'featured_story_slug')})]
+
+    def has_add_permission(self, request):
+        return not SiteSettings.objects.exists() and super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TravelGuide)

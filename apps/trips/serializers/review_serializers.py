@@ -24,6 +24,7 @@ class TripReviewReadSerializer(serializers.ModelSerializer):
             "content",
             "travel_date",
             "is_verified",
+            "is_published",
             "created_at",
         ]
         read_only_fields = fields

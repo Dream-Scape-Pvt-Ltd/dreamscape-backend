@@ -1,5 +1,6 @@
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
-from django.db.models import CharField, F, Q, Value
+from django.db import connection
+from django.db.models import CharField, F, Q, Value, Case, When, FloatField
 from django.db.models.functions import Cast, Coalesce, Concat, JSONObject, Substr
 
 from apps.content_cms.models import TravelGuide
@@ -34,7 +35,16 @@ def global_search_queryset(query_text, entity_type=None):
     for kind, qs, vector, title, slug, snippet, prefix, meta in sources:
         if entity_type and kind != entity_type:
             continue
-        qs = qs.annotate(search_vector=vector, search_rank=SearchRank(vector, query)).filter(search_vector=query)
+        if connection.vendor == 'postgresql':
+            qs = qs.annotate(search_vector=vector, search_rank=SearchRank(vector, query)).filter(search_vector=query)
+        else:
+            # SQLite development uses portable matching; PostgreSQL keeps full-text ranking.
+            fields = {'trip': ('title', 'overview'), 'destination': ('name', 'region_name'),
+                      'guide': ('title', 'markdown_content'), 'faq': ('question', 'answer')}[kind]
+            title_match = Q(**{fields[0] + '__icontains': query_text.strip()})
+            body_match = Q(**{fields[1] + '__icontains': query_text.strip()})
+            qs = qs.filter(title_match | body_match).annotate(search_rank=Case(
+                When(title_match, then=Value(2.0)), default=Value(1.0), output_field=FloatField()))
         # Fixed projection gives all UNION arms identical SQL types and column order.
         queries.append(qs.order_by().values('id').annotate(
             entity_type=Value(kind, output_field=CharField()), title=title, slug=slug,

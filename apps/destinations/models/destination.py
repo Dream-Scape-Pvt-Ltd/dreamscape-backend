@@ -23,6 +23,13 @@ class Destination(TimeStampedModel):
         db_index=True,
     )
     region_name = models.CharField(max_length=150, blank=True)
+    headline = models.CharField(max_length=180, blank=True)
+    description = models.TextField(blank=True)
+    highlights = models.CharField(max_length=400, blank=True)
+    trail_style = models.CharField(max_length=200, blank=True)
+    pace = models.CharField(max_length=200, blank=True)
+    base = models.CharField(max_length=150, blank=True)
+    mood = models.CharField(max_length=30, blank=True)
     visa_guidelines = models.TextField(blank=True)
     permit_details = models.TextField(blank=True)
     hero_media = models.URLField(max_length=500, blank=True)
