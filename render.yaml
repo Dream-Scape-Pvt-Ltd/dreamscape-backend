@@ -1,0 +1,64 @@
+# Render Blueprint for the Dreamscape Treks API.
+# Deploys from GitHub `main` only after the GitHub Actions checks pass
+# (.github/workflows/ci.yml). Values marked `sync: false` are entered once in
+# the Render dashboard and never stored in this repo.
+services:
+  - type: web
+    name: dreamscape-api
+    runtime: python
+    # Same region as the existing `dreamscape-db` Postgres instance.
+    region: singapore
+    plan: free
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Free instances can't run a preDeployCommand, so migrations run at start.
+    startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /admin/login/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.3
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      # Internal connection string of the existing `dreamscape-db` database.
+      - key: DATABASE_URL
+        sync: false
+      # Shared secret the Next.js server sends as X-Internal-Token; the frontend
+      # service needs the same value.
+      - key: INTERNAL_API_TOKEN
+        generateValue: true
+      # Render's proxy appends the caller's IP to X-Forwarded-For.
+      - key: NUM_PROXIES
+        value: "1"
+      # No separate Celery worker on the free plan: tasks run inline.
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "True"
+      # Frontend origin(s), comma-separated, e.g. https://dreamscape-web.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: PUBLIC_SITE_URL
+        sync: false
+      # This service's own public origin, e.g. https://dreamscape-api.onrender.com
+      - key: MEDIA_PUBLIC_BASE_URL
+        sync: false
+      # Uploaded media lives in Backblaze B2; the instance disk is ephemeral.
+      - key: USE_B2
+        value: "True"
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
+      - key: B2_ENDPOINT
+        sync: false
+      - key: B2_REGION
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: B2B_ADMIN_EMAIL
+        sync: false
