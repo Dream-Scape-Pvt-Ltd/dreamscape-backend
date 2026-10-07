@@ -107,6 +107,14 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
             data["tailor_made"] = data.get("tailor_made_detail")
         return super().to_internal_value(data)
 
+    def validate_phone(self, value):
+        if value:
+            import re
+            digits = re.sub(r"\D", "", value)
+            if len(digits) < 6 or len(digits) > 20 or not re.match(r"^[0-9\s\-()+]+$", value):
+                raise serializers.ValidationError("Please enter a valid phone number with 6 to 15 digits.")
+        return value
+
     def validate(self, attrs):
         # Keep the optional trip preferences consistent with the chosen style.
         style = attrs.get("trip_style", "")

@@ -231,6 +231,13 @@ class InquiryAPITests(APITestCase):
         response = self.client.post(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_invalid_phone_number_rejected(self):
+        url = reverse("inquiries:inquiry-list-create")
+        payload = {"inquiry_type": InquiryType.GENERAL, "full_name": "Sam", "email": "sam@example.com", "message": "Hi", "phone": "123"}
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("phone", response.json()["error"]["details"])
+
     def test_rbac_inquiry_list_forbidden_for_customers(self):
         """Customers and anonymous users cannot view CRM inquiries (401/403)."""
         url = reverse("inquiries:inquiry-list-create")
