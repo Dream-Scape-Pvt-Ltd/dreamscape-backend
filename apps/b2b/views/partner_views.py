@@ -14,12 +14,6 @@ from apps.b2b.serializers.partner_serializers import (
 )
 from apps.b2b.tasks import queue_partner_email
 from apps.common.permissions import IsAdminRole
-from apps.common.throttling import RegistrationThrottle
-
-
-class PartnerRegistrationThrottle(RegistrationThrottle):
-    def get_cache_key(self, request, view):
-        return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
 
 
 class B2BRegisterView(generics.GenericAPIView):

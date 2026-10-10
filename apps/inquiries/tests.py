@@ -2,6 +2,7 @@ import re
 from datetime import date, timedelta
 from decimal import Decimal
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -28,6 +29,8 @@ User = get_user_model()
 
 class InquiryAPITests(APITestCase):
     def setUp(self):
+        # Every test posts from the same IP; reset throttle counters between tests.
+        cache.clear()
         # Create users: Admin, Sales Agent, and Customer
         self.admin_user = User.objects.create_user(
             email="admin@dreamscapetreks.com",
@@ -376,6 +379,7 @@ class CRMExpansionAPITests(APITestCase):
     """
 
     def setUp(self):
+        cache.clear()
         self.admin_user = User.objects.create_user(
             email="admin@dreamscapetreks.com",
             password="AdminPassword123!",

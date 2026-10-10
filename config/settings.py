@@ -12,10 +12,11 @@ env = environ.Env(
 )
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-%+g^!r@2ek!snk&md*4yoj_6$o7(!nec(6(6%g4c%)bnnnm@8-')
+# Required: no fallback, so a missing value fails at startup instead of running with a known key.
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool('DEBUG', default=True)
+DEBUG = env.bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 # Render provides the service's own hostname; trust it without listing it by hand.
@@ -28,7 +29,13 @@ if RENDER_EXTERNAL_HOSTNAME:
 # The hosting proxy terminates TLS and forwards the original scheme.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = not DEBUG
-
+# HSTS is only sent on HTTPS responses, so it is harmless locally and in tests.
+SECURE_HSTS_SECONDS = 0 if DEBUG else env.int('SECURE_HSTS_SECONDS', default=31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
+# Render already redirects HTTP at its edge; this is defence in depth. The health
+# check is exempt because Render probes the instance directly over plain HTTP.
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+SECURE_REDIRECT_EXEMPT = [r'^healthz/$']
 
 
 # Application definition
@@ -108,6 +115,14 @@ DATABASES = {
         default=f"postgres://{env('DB_USER', default='postgres')}:{env('DB_PASSWORD', default='')}@{env('DB_HOST', default='localhost')}:{env('DB_PORT', default='5432')}/{env('DB_NAME', default='dreamscape_db')}"
     )
 }
+# Reuse connections between requests instead of reconnecting every time.
+DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
+DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+# Shared cache — throttle counters live here, so it must be shared across workers
+# and survive restarts in production. Use `dbcache://django_cache` (needs
+# `manage.py createcachetable`) or `redis://...`; local dev defaults to memory.
+CACHES = {'default': env.cache('CACHE_URL', default='locmemcache://')}
 
 
 # Password validation
@@ -215,6 +230,7 @@ REST_FRAMEWORK = {
         'login': '10/hour',
         'password_reset': '3/hour',
         'inquiry_submit': '10/hour',
+        'public_write': '30/hour',
         'payment_initiate': '10/minute',
         'search': '60/minute',
     },
@@ -293,12 +309,19 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # Partner portal infrastructure. Private files must never be served as public media.
+# With USE_B2 they go to the bucket's b2b-private/ prefix; this root is the local fallback.
 B2B_PRIVATE_ROOT = env('B2B_PRIVATE_ROOT', default=str(BASE_DIR / 'private_media'))
 B2B_DOWNLOAD_TTL = env.int('B2B_DOWNLOAD_TTL', default=300)
 RESEND_API_KEY = env('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@dreamscapetreks.com')
 B2B_ADMIN_EMAIL = env('B2B_ADMIN_EMAIL', default='')
 PUBLIC_SITE_URL = env('PUBLIC_SITE_URL', default='https://dreamscape-treks.com').rstrip('/')
+# Django's own mail (e.g. password reset) goes through Resend when a key is set;
+# without one, local dev prints mail to the console. Tests always use locmem.
+if RESEND_API_KEY:
+    EMAIL_BACKEND = 'apps.common.email.ResendEmailBackend'
+elif DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
@@ -343,3 +366,19 @@ CELERY_BEAT_SCHEDULE = {
 # Administrative security: Django admin session expires when browser closes
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 3600  # 1 hour max session
+
+# Log to stdout so Render's log stream captures app warnings and request errors.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'},
+    },
+    'root': {'handlers': ['console'], 'level': env('LOG_LEVEL', default='INFO')},
+    'loggers': {
+        'django.request': {'level': 'ERROR'},
+    },
+}

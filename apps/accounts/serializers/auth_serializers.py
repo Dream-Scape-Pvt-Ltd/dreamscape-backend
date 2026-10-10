@@ -1,3 +1,6 @@
+import logging
+
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
@@ -15,6 +18,7 @@ from apps.accounts.models import UserRole
 from apps.accounts.serializers.user_serializers import UserProfileSerializer
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -226,13 +230,11 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
-            # In development/test or until Celery mail worker is wired:
-            # We send via Django's standard send_mail
             reset_subject = "Dreamscape Treks — Password Reset Request"
             reset_message = (
                 f"Hello {user.full_name},\n\n"
                 f"We received a request to reset your password for your Dreamscape Treks account.\n"
-                f"Use the following token details to reset your password:\n"
+                f"Go to {settings.PUBLIC_SITE_URL}/reset-password and enter these details:\n"
                 f"UID: {uid}\n"
                 f"Token: {token}\n\n"
                 f"If you did not make this request, you can safely ignore this email."
@@ -241,12 +243,12 @@ class PasswordResetRequestSerializer(serializers.Serializer):
                 send_mail(
                     subject=reset_subject,
                     message=reset_message,
-                    from_email="no-reply@dreamscapetreks.com",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
-                    fail_silently=True,
                 )
             except Exception:
-                pass
+                # Still answer success (no user enumeration), but make the failure visible.
+                logger.exception("Password reset email could not be sent")
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):

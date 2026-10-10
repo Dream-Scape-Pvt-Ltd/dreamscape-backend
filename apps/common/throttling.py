@@ -53,6 +53,19 @@ class DreamscapeIPThrottle(InternalReadExemptMixin, SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
+class WriteThrottleMixin:
+    """Adds `write_throttle_classes` on top of the defaults for non-safe methods only,
+    so a public POST endpoint gets a tight limit without touching its staff GET list."""
+
+    write_throttle_classes = ()
+
+    def get_throttles(self):
+        throttles = super().get_throttles()
+        if self.request.method not in SAFE_METHODS:
+            throttles += [throttle() for throttle in self.write_throttle_classes]
+        return throttles
+
+
 class RegistrationThrottle(DreamscapeAnonThrottle):
     """Throttle rate limiting for account registration (5/hour)."""
     scope = "registration"
@@ -71,6 +84,11 @@ class PasswordResetThrottle(DreamscapeAnonThrottle):
 class InquiryThrottle(DreamscapeAnonThrottle):
     """Throttle rate limiting for public inquiry submissions (10/hour)."""
     scope = "inquiry_submit"
+
+
+class PublicWriteThrottle(DreamscapeAnonThrottle):
+    """Throttle for anonymous bookings, waitlist joins, reviews and reset confirms (30/hour)."""
+    scope = "public_write"
 
 
 class PaymentInitiateThrottle(DreamscapeAnonThrottle):

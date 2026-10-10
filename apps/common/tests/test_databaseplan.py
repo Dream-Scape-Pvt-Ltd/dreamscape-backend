@@ -7,10 +7,6 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from apps.accounts.models import UserRole
-from apps.accounts.serializers.user_serializers import (
-    UserRegistrationSerializer,
-    UserProfileSerializer,
-)
 from apps.destinations.models import Destination, DestinationCountry, ActivityCategory
 from apps.trips.models import (
     Trip,
@@ -474,7 +470,7 @@ class DatabaseArchitectureTestCase(TestCase):
             slug="everest-trekking-permits-guide-2026",
             country="Nepal",
             region="Khumbu",
-            category=GuideCategory.PERMITS,
+            category=GuideCategory.TRAVEL_TIPS,
             markdown_content="# Permits Required\n\n1. Sagarmatha National Park\n2. Khumbu Municipality Card",
             is_published=True,
         )

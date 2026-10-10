@@ -129,6 +129,23 @@ class PartnerPortalTests(PortalFixtures, APITestCase):
             B2BAsset.objects.filter(pk=self.asset.pk).update(is_active=False)
             self.assertEqual(self.client.get(path).status_code, 404)
 
+    def test_private_storage_uses_b2_private_prefix_when_enabled(self):
+        from storages.backends.s3 import S3Storage
+        from apps.b2b.storage import B2_PRIVATE_PREFIX, PrivateAssetStorage
+        from apps.common.media import ALLOWED_PREFIXES
+
+        b2_options = {'access_key': 'k', 'secret_key': 's', 'bucket_name': 'b',
+                      'endpoint_url': 'https://s3.example.com', 'querystring_auth': True}
+        storages = {'default': {'BACKEND': 'storages.backends.s3.S3Storage', 'OPTIONS': b2_options}}
+        with override_settings(USE_B2=True, STORAGES=storages):
+            backend = PrivateAssetStorage().backend
+        self.assertIsInstance(backend, S3Storage)
+        self.assertEqual(backend.location, B2_PRIVATE_PREFIX)
+        # The public /media/ redirect must never serve partner files.
+        self.assertFalse(f'{B2_PRIVATE_PREFIX}/b2b_assets/x.pdf'.startswith(ALLOWED_PREFIXES))
+        with self.assertRaises(ValueError):
+            PrivateAssetStorage().url('b2b_assets/x.pdf')
+
     def test_ledger_isolation_and_commission_timestamps(self):
         self.client.force_authenticate(self.partner_user)
         response = self.client.get('/api/v1/b2b/bookings/')

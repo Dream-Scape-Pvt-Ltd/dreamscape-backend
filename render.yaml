@@ -12,9 +12,10 @@ services:
     branch: main
     autoDeployTrigger: checksPass
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    # Free instances can't run a preDeployCommand, so migrations run at start.
-    startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
-    healthCheckPath: /admin/login/
+    # Free instances can't run a preDeployCommand, so migrations (and the
+    # throttle cache table) are set up at start. 2 workers fit the 512 MB plan.
+    startCommand: python manage.py migrate --noinput && python manage.py createcachetable && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    healthCheckPath: /healthz/
     envVars:
       - key: PYTHON_VERSION
         value: 3.14.3
@@ -22,6 +23,11 @@ services:
         value: "False"
       - key: SECRET_KEY
         generateValue: true
+      - key: SECURE_SSL_REDIRECT
+        value: "True"
+      # Throttle counters shared by all workers and kept across restarts.
+      - key: CACHE_URL
+        value: dbcache://django_cache
       # Internal connection string of the existing `dreamscape-db` database.
       - key: DATABASE_URL
         sync: false
@@ -32,7 +38,7 @@ services:
       # Render's proxy appends the caller's IP to X-Forwarded-For.
       - key: NUM_PROXIES
         value: "1"
-      # No separate Celery worker on the free plan: tasks run inline.
+      # No Celery worker: tasks run inline, and the cron job below replaces Beat.
       - key: CELERY_TASK_ALWAYS_EAGER
         value: "True"
       # Frontend origin(s), comma-separated, e.g. https://dreamscape-web.onrender.com
@@ -62,3 +68,37 @@ services:
         sync: false
       - key: B2B_ADMIN_EMAIL
         sync: false
+
+  # Replaces Celery Beat: runs the scheduled sweeps (partner email outbox,
+  # waitlist expiry, CRM reminders/SLA/travel status, nightly rollup at 02:00 UTC)
+  # every 15 minutes. Cron jobs are not available on the free plan.
+  - type: cron
+    name: dreamscape-scheduled-jobs
+    runtime: python
+    region: singapore
+    plan: starter
+    branch: main
+    autoDeployTrigger: checksPass
+    schedule: "*/15 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py run_scheduled_jobs
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.3
+      - key: DEBUG
+        value: "False"
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "True"
+      - key: CACHE_URL
+        value: dbcache://django_cache
+      # Everything else is shared with the API service.
+      - key: SECRET_KEY
+        fromService: {type: web, name: dreamscape-api, envVarKey: SECRET_KEY}
+      - key: DATABASE_URL
+        fromService: {type: web, name: dreamscape-api, envVarKey: DATABASE_URL}
+      - key: RESEND_API_KEY
+        fromService: {type: web, name: dreamscape-api, envVarKey: RESEND_API_KEY}
+      - key: B2B_ADMIN_EMAIL
+        fromService: {type: web, name: dreamscape-api, envVarKey: B2B_ADMIN_EMAIL}
+      - key: PUBLIC_SITE_URL
+        fromService: {type: web, name: dreamscape-api, envVarKey: PUBLIC_SITE_URL}

@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.common.permissions import IsSalesAgentOrAdmin
+from apps.common.throttling import InquiryThrottle, WriteThrottleMixin
 from apps.inquiries.filters import InquiryFilter
 from apps.inquiries.models import Inquiry, InquiryNote
 from apps.inquiries.serializers import (
@@ -17,7 +18,7 @@ from apps.inquiries.serializers import (
 )
 
 
-class InquiryListCreateView(generics.ListCreateAPIView):
+class InquiryListCreateView(WriteThrottleMixin, generics.ListCreateAPIView):
     """
     POST /api/v1/inquiries/
         Public inbound lead capture form (General, Journey, or Tailor-Made trip inquiries).
@@ -34,6 +35,7 @@ class InquiryListCreateView(generics.ListCreateAPIView):
 
     filter_backends = [DjangoFilterBackend]
     filterset_class = InquiryFilter
+    write_throttle_classes = (InquiryThrottle,)
 
     def get_permissions(self):
         if self.request.method == "POST":

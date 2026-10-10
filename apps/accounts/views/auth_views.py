@@ -19,6 +19,7 @@ from apps.accounts.serializers.user_serializers import UserProfileSerializer
 from apps.common.throttling import (
     LoginThrottle,
     PasswordResetThrottle,
+    PublicWriteThrottle,
     RegistrationThrottle,
 )
 
@@ -184,6 +185,7 @@ class PasswordResetConfirmView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [PublicWriteThrottle]
 
     @extend_schema(
         request=PasswordResetConfirmSerializer,

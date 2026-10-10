@@ -13,9 +13,10 @@ from apps.bookings.serializers import (
 )
 from apps.bookings.tasks import send_booking_confirmation_email
 from apps.common.permissions import HasBookingTokenOrAdmin, IsSalesAgentOrAdmin
+from apps.common.throttling import PublicWriteThrottle, WriteThrottleMixin
 
 
-class BookingListCreateView(generics.ListCreateAPIView):
+class BookingListCreateView(WriteThrottleMixin, generics.ListCreateAPIView):
     """
     POST /api/v1/bookings/
         Initiate a booking checkout with atomic seat locking and split-payment calculation.
@@ -25,6 +26,8 @@ class BookingListCreateView(generics.ListCreateAPIView):
         List bookings.
         Permissions: IsAuthenticated + IsSalesAgentOrAdmin (Administrative only).
     """
+
+    write_throttle_classes = (PublicWriteThrottle,)
 
     def get_permissions(self):
         if self.request.method == "POST":

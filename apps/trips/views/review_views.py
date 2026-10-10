@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from apps.common.lookups import ref_filter
 from apps.common.permissions import IsAdminRole
+from apps.common.throttling import PublicWriteThrottle, WriteThrottleMixin
 from apps.trips.models import Trip, TripReview
 from apps.trips.serializers import (
     TripReviewCreateSerializer,
@@ -14,13 +15,14 @@ from apps.trips.serializers import (
 )
 
 
-class ReviewListCreateView(generics.ListCreateAPIView):
+class ReviewListCreateView(WriteThrottleMixin, generics.ListCreateAPIView):
     """
     List published reviews for a trip, or submit a new customer review.
     Submitted reviews enter the moderation queue.
     """
 
     permission_classes = [AllowAny]
+    write_throttle_classes = (PublicWriteThrottle,)
 
     def get_serializer_class(self):
         if self.request.method == "POST":

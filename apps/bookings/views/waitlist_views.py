@@ -9,10 +9,11 @@ from apps.bookings.models import DepartureWaitlistEntry, WaitlistStatus
 from apps.bookings.serializers import WaitlistEntrySerializer, WaitlistJoinSerializer
 from apps.bookings.services import promote_waitlist
 from apps.common.permissions import IsAdminRole
+from apps.common.throttling import PublicWriteThrottle, WriteThrottleMixin
 from apps.trips.models import TripDeparture
 
 
-class WaitlistJoinView(generics.CreateAPIView):
+class WaitlistJoinView(WriteThrottleMixin, generics.CreateAPIView):
     """
     POST /api/v1/bookings/waitlist/
         Join the waitlist for a full departure.
@@ -20,6 +21,7 @@ class WaitlistJoinView(generics.CreateAPIView):
     """
 
     permission_classes = [AllowAny]
+    write_throttle_classes = (PublicWriteThrottle,)
     serializer_class = WaitlistJoinSerializer
 
     @extend_schema(

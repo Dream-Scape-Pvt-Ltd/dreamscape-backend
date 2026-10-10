@@ -6,6 +6,7 @@ API Docs: /api/v1/schema/swagger/ | /api/v1/schema/redoc/
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
 from django.urls import path, include
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -14,6 +15,9 @@ from drf_spectacular.views import (
 )
 
 urlpatterns = [
+    # Render health check: cheap, no database or template work.
+    path("healthz/", lambda request: HttpResponse("ok", content_type="text/plain"), name="healthz"),
+
     # Django Admin
     path("admin/", admin.site.urls),
 
