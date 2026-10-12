@@ -115,8 +115,8 @@ DATABASES = {
         default=f"postgres://{env('DB_USER', default='postgres')}:{env('DB_PASSWORD', default='')}@{env('DB_HOST', default='localhost')}:{env('DB_PORT', default='5432')}/{env('DB_NAME', default='dreamscape_db')}"
     )
 }
-# Reuse connections between requests instead of reconnecting every time.
-DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)
+# Reuse connections in production; close them per-request in development to avoid connection exhaustion with runserver.
+DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=0 if DEBUG else 60)
 DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 # Shared cache — throttle counters live here, so it must be shared across workers
