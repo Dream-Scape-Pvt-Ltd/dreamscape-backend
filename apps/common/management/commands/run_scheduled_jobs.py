@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.b2b.tasks import dispatch_pending_partner_emails
 from apps.bookings.tasks import expire_waitlist_offers
+from apps.emails.tasks import dispatch_pending_outbound_emails
 from apps.inquiries.tasks import (
     advance_travel_statuses,
     check_sla_breaches,
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 # needing work, so running one more often than its Beat schedule is harmless.
 FREQUENT_JOBS = [
     dispatch_pending_partner_emails,
+    dispatch_pending_outbound_emails,
     expire_waitlist_offers,
     send_task_reminders,
     check_sla_breaches,

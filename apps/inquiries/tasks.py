@@ -8,13 +8,59 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-def send_inquiry_acknowledgement_email(inquiry_id):
+def _join(values):
+    return ", ".join(str(v) for v in values if v) if isinstance(values, list) else values
+
+
+def send_inquiry_team_alert(inquiry):
     """
-    Sends automated acknowledgement email to the client confirming receipt of inquiry:
-    "We have received your journey inquiry; our team is reviewing your requirements..."
-    Offloaded to Celery worker in production.
+    Queues an email to the team inbox (INQUIRY_NOTIFY_EMAIL) with the inquiry's
+    details; replying goes straight to the customer. Blank fields are left out.
     """
-    logger.info(f"Sending inquiry acknowledgement email for inquiry ID: {inquiry_id}")
+    from apps.b2b.tasks import queue_partner_email
+
+    if not settings.INQUIRY_NOTIFY_EMAIL:
+        return False
+
+    topic = inquiry.trip.title if inquiry.trip else inquiry.get_inquiry_type_display()
+    departure = inquiry.departure
+    fields = [
+        ("Inquiry", inquiry.inquiry_number),
+        ("Type", inquiry.get_inquiry_type_display()),
+        ("Name", inquiry.full_name),
+        ("Email", inquiry.email),
+        ("Phone", inquiry.phone),
+        ("WhatsApp", inquiry.whatsapp_number),
+        ("Trip", inquiry.trip.title if inquiry.trip else ""),
+        ("Departure", f"{departure.start_date} to {departure.end_date}" if departure else ""),
+        ("Preferred dates", inquiry.preferred_dates),
+        ("Group size", inquiry.group_size),
+        ("Budget (USD)", inquiry.estimated_budget),
+        ("Trip style", inquiry.get_trip_style_display() if inquiry.trip_style else ""),
+        ("Private party", inquiry.get_private_party_display() if inquiry.private_party else ""),
+        ("Children's ages", inquiry.children_ages),
+        ("Comfort", inquiry.get_comfort_level_display() if inquiry.comfort_level else ""),
+        ("Support", inquiry.get_support_level_display() if inquiry.support_level else ""),
+    ]
+    tailor_made = getattr(inquiry, "tailor_made_detail", None)
+    if tailor_made:
+        fields += [
+            ("Destinations", _join(tailor_made.custom_destinations)),
+            ("Activities", _join(tailor_made.desired_activities)),
+            ("Fitness level", tailor_made.fitness_level),
+            ("Accommodation", tailor_made.accommodation_standard),
+            ("Guide language", tailor_made.guide_language_preference),
+        ]
+    lines = [f"{label}: {value}" for label, value in fields if value not in (None, "")]
+    if inquiry.message:
+        lines += ["", "Message:", inquiry.message]
+
+    queue_partner_email(
+        settings.INQUIRY_NOTIFY_EMAIL,
+        f"New inquiry {inquiry.inquiry_number}: {inquiry.full_name} ({topic})"[:255],
+        "\n".join(lines),
+        reply_to=inquiry.email,
+    )
     return True
 
 

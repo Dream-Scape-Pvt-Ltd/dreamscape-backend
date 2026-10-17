@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'apps.bookings',
     'apps.payments',
     'apps.inquiries',
+    'apps.emails',
     'apps.b2b',
     'apps.content_cms',
     'apps.search',
@@ -315,6 +316,10 @@ B2B_DOWNLOAD_TTL = env.int('B2B_DOWNLOAD_TTL', default=300)
 RESEND_API_KEY = env('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@dreamscapetreks.com')
 B2B_ADMIN_EMAIL = env('B2B_ADMIN_EMAIL', default='')
+# Svix signing secret ("whsec_...") of the Resend webhook that reports delivery status.
+RESEND_WEBHOOK_SECRET = env('RESEND_WEBHOOK_SECRET', default='')
+# Team inbox alerted on every new inquiry; leave unset to send nothing.
+INQUIRY_NOTIFY_EMAIL = env('INQUIRY_NOTIFY_EMAIL', default='')
 PUBLIC_SITE_URL = env('PUBLIC_SITE_URL', default='https://dreamscape-treks.com').rstrip('/')
 # Django's own mail (e.g. password reset) goes through Resend when a key is set;
 # without one, local dev prints mail to the console. Tests always use locmem.

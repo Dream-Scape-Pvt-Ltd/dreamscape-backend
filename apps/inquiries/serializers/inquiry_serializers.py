@@ -3,6 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from apps.accounts.serializers.user_serializers import UserMinimalSerializer
+from apps.emails.tasks import queue_inquiry_acknowledgement
 from apps.inquiries.models import (
     Customer,
     Inquiry,
@@ -17,7 +18,7 @@ from apps.inquiries.models import (
 from apps.inquiries.serializers.activity_serializers import ActivitySerializer
 from apps.inquiries.serializers.tag_serializers import TagSerializer
 from apps.inquiries.serializers.tailor_made_serializers import TailorMadeRequestSerializer
-from apps.inquiries.tasks import send_inquiry_acknowledgement_email, send_agent_whatsapp_alert
+from apps.inquiries.tasks import send_agent_whatsapp_alert, send_inquiry_team_alert
 from apps.inquiries.utils import generate_inquiry_number
 from apps.trips.models import Trip, TripDeparture
 from apps.trips.serializers.departure_serializers import TripDepartureSerializer
@@ -156,9 +157,12 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
                 tm_data = tailor_made_data or {}
                 TailorMadeRequest.objects.create(inquiry=inquiry, **tm_data)
 
-        # Trigger async tasks
+            # Queued in the same transaction so the alert exists iff the inquiry does.
+            send_inquiry_team_alert(inquiry)
+            # Customer "we got your inquiry" no-reply email; never blocks the inquiry.
+            queue_inquiry_acknowledgement(inquiry)
+
         try:
-            send_inquiry_acknowledgement_email(inquiry.id)
             send_agent_whatsapp_alert(inquiry.id)
         except Exception:
             pass

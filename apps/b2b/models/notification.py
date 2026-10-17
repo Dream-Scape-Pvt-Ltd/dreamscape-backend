@@ -8,6 +8,7 @@ class PartnerEmail(TimeStampedModel):
     recipient = models.EmailField()
     subject = models.CharField(max_length=255)
     body = models.TextField()
+    reply_to = models.EmailField(blank=True)
     sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
     next_attempt_at = models.DateTimeField(null=True, blank=True, db_index=True)
     attempts = models.PositiveIntegerField(default=0)

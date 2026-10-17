@@ -68,6 +68,12 @@ services:
         sync: false
       - key: B2B_ADMIN_EMAIL
         sync: false
+      # Signing secret of the Resend delivery-status webhook (/api/v1/emails/webhook/resend/).
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # Team inbox alerted on each new inquiry (hosted on Zoho Mail).
+      - key: INQUIRY_NOTIFY_EMAIL
+        value: info@dreamscapetreks.com
 
   # Replaces Celery Beat: runs the scheduled sweeps (partner email outbox,
   # waitlist expiry, CRM reminders/SLA/travel status, nightly rollup at 02:00 UTC)

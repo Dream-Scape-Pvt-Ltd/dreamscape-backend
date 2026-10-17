@@ -1,14 +1,18 @@
 import re
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import UserRole
+from apps.b2b.models import PartnerEmail
+from apps.b2b.tasks import deliver_partner_email
 from apps.destinations.models import Destination, ActivityCategory, DestinationCountry
 from apps.inquiries.models import (
     Activity,
@@ -630,3 +634,51 @@ class CRMExpansionAPITests(APITestCase):
         self.assertEqual(data["email"], "repeat@example.com")
         self.assertEqual(len(data["inquiries"]), 1)
         self.assertEqual(data["inquiries"][0]["inquiry_number"], inquiry_number)
+
+
+class InquiryTeamAlertTests(APITestCase):
+    """New inquiries queue an email to the team inbox that replies to the customer."""
+
+    def setUp(self):
+        cache.clear()
+        self.url = reverse("inquiries:inquiry-list-create")
+        self.payload = {
+            "inquiry_type": InquiryType.TAILOR_MADE,
+            "full_name": "Maya Lin",
+            "email": "maya.lin@example.com",
+            "message": "Thinking about Everest in spring.",
+            "tailor_made": {"custom_destinations": ["Gokyo", "Cho La"]},
+        }
+
+    @override_settings(INQUIRY_NOTIFY_EMAIL="info@dreamscapetreks.com", RESEND_API_KEY="")
+    def test_alert_queued_with_reply_to_customer(self):
+        response = self.client.post(self.url, self.payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        number = response.json()["data"]["inquiry_number"]
+
+        email = PartnerEmail.objects.get()
+        self.assertEqual(email.recipient, "info@dreamscapetreks.com")
+        self.assertEqual(email.reply_to, "maya.lin@example.com")
+        self.assertIn(number, email.subject)
+        self.assertIn("Destinations: Gokyo, Cho La", email.body)
+        self.assertIn("Thinking about Everest in spring.", email.body)
+        # Blank fields are left out rather than shown empty.
+        self.assertNotIn("Phone", email.body)
+        self.assertFalse(re.search(r"^(?!Message:)[^:\n]+: *$", email.body, re.MULTILINE))
+
+    @override_settings(INQUIRY_NOTIFY_EMAIL="")
+    def test_nothing_queued_without_notify_address(self):
+        response = self.client.post(self.url, self.payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(PartnerEmail.objects.exists())
+
+    @override_settings(RESEND_API_KEY="test-key")
+    def test_delivery_sends_reply_to(self):
+        email = PartnerEmail.objects.create(
+            recipient="info@dreamscapetreks.com", subject="s", body="b", reply_to="maya.lin@example.com"
+        )
+        with patch("apps.b2b.tasks.requests.post") as post:
+            deliver_partner_email(str(email.pk))
+        self.assertEqual(post.call_args.kwargs["json"]["reply_to"], "maya.lin@example.com")
+        email.refresh_from_db()
+        self.assertIsNotNone(email.sent_at)

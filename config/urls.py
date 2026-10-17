@@ -43,6 +43,7 @@ urlpatterns = [
     # API v1 — CRM & Inquiries (Phase 5)
     # -----------------------------------------------------------------------
     path("api/v1/inquiries/", include("apps.inquiries.urls")),
+    path("api/v1/emails/", include("apps.emails.urls")),
 
     # -----------------------------------------------------------------------
     # API v1 — B2B Partner Portal (Phase 6)

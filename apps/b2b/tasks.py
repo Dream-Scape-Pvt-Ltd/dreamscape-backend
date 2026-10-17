@@ -13,8 +13,8 @@ from apps.b2b.models import PartnerEmail
 logger = logging.getLogger(__name__)
 
 
-def queue_partner_email(recipient, subject, body):
-    email = PartnerEmail.objects.create(recipient=recipient, subject=subject, body=body)
+def queue_partner_email(recipient, subject, body, reply_to=""):
+    email = PartnerEmail.objects.create(recipient=recipient, subject=subject, body=body, reply_to=reply_to)
     # The outbox sweep retries publishing if Redis is unavailable after commit.
     def publish():
         deliver_partner_email.delay(str(email.pk))
@@ -31,12 +31,15 @@ def deliver_partner_email(email_id):
         try:
             if not settings.RESEND_API_KEY:
                 raise ValueError("RESEND_API_KEY is not configured")
+            payload = {"from": settings.DEFAULT_FROM_EMAIL, "to": [email.recipient],
+                       "subject": email.subject, "text": email.body}
+            if email.reply_to:
+                payload["reply_to"] = email.reply_to
             response = requests.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}",
                          "Idempotency-Key": f"partner-email/{email.pk}"},
-                json={"from": settings.DEFAULT_FROM_EMAIL, "to": [email.recipient],
-                      "subject": email.subject, "text": email.body},
+                json=payload,
                 timeout=15,
             )
             response.raise_for_status()
