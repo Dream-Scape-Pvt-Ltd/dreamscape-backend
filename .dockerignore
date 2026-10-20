@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+media/
+private_media/
+staticfiles/
+*.md
